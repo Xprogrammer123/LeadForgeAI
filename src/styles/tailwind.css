@@ -1,0 +1,207 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Core Background Colors */
+    --color-background: #0a0a0a; /* black */
+    --color-foreground: #ffffff; /* white */
+    --color-surface: #1a1a1a; /* gray-900 */
+    --color-border: rgba(255, 255, 255, 0.1); /* white with opacity */
+    --color-input: #1a1a1a; /* gray-900 */
+    --color-ring: #84cc16; /* lime-500 */
+
+    /* Card Colors */
+    --color-card: #1a1a1a; /* gray-900 */
+    --color-card-foreground: #ffffff; /* white */
+    --color-popover: #1a1a1a; /* gray-900 */
+    --color-popover-foreground: #ffffff; /* white */
+
+    /* Muted Colors */
+    --color-muted: #262626; /* gray-800 */
+    --color-muted-foreground: #a3a3a3; /* gray-400 */
+
+    /* Primary Colors */
+    --color-primary: #84cc16; /* lime-500 */
+    --color-primary-foreground: #0a0a0a; /* black */
+
+    /* Secondary Colors */
+    --color-secondary: #22c55e; /* green-500 */
+    --color-secondary-foreground: #ffffff; /* white */
+
+    /* Accent Colors */
+    --color-accent: #fbbf24; /* amber-400 */
+    --color-accent-foreground: #0a0a0a; /* black */
+
+    /* State Colors */
+    --color-success: #10b981; /* emerald-500 */
+    --color-success-foreground: #ffffff; /* white */
+    --color-warning: #f59e0b; /* amber-500 */
+    --color-warning-foreground: #ffffff; /* white */
+    --color-error: #ef4444; /* red-500 */
+    --color-error-foreground: #ffffff; /* white */
+    --color-destructive: #ef4444; /* red-500 */
+    --color-destructive-foreground: #ffffff; /* white */
+
+    /* Glassmorphism Variables */
+    --glassmorphism-backdrop: rgba(26, 26, 26, 0.8); /* gray-900 with opacity */
+    --glassmorphism-border: rgba(255, 255, 255, 0.1); /* white with opacity */
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    font-family: 'Inter', sans-serif;
+  }
+
+  /* Smooth scrolling for anchor navigation */
+  html {
+    scroll-behavior: smooth;
+  }
+
+  /* Custom scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-surface;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-muted rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-primary;
+  }
+}
+
+@layer components {
+  /* Glassmorphism card styling */
+  .glassmorphism {
+    background: var(--glassmorphism-backdrop);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--glassmorphism-border);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  /* CTA button styling */
+  .cta-button {
+    box-shadow: 0 0 0 1px rgba(132, 204, 22, 0.2), 0 4px 16px rgba(0, 0, 0, 0.4);
+    transition: all 200ms ease-in-out;
+  }
+
+  .cta-button:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 0 0 2px rgba(132, 204, 22, 0.4), 0 8px 24px rgba(0, 0, 0, 0.5);
+  }
+
+  /* Form field focus states */
+  .form-field:focus {
+    border: 2px solid var(--color-primary);
+    outline: none;
+  }
+
+  /* Animation utilities */
+  .animate-fade-in {
+    animation: fadeIn 300ms ease-out;
+  }
+
+  .animate-slide-up {
+    animation: slideUp 200ms ease-in-out;
+  }
+
+  @keyframes fadeIn {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  @keyframes slideUp {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+}
+
+@layer utilities {
+  /* Typography utilities */
+  .font-headline {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+  }
+
+  .font-headline-bold {
+    font-family: 'Inter', sans-serif;
+    font-weight: 800;
+  }
+
+  .font-headline-black {
+    font-family: 'Inter', sans-serif;
+    font-weight: 900;
+  }
+
+  .font-body {
+    font-family: 'Inter', sans-serif;
+    font-weight: 400;
+  }
+
+  .font-body-medium {
+    font-family: 'Inter', sans-serif;
+    font-weight: 500;
+  }
+
+  .font-body-semibold {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+  }
+
+  .font-cta {
+    font-family: 'Inter', sans-serif;
+    font-weight: 600;
+  }
+
+  .font-cta-bold {
+    font-family: 'Inter', sans-serif;
+    font-weight: 700;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 400;
+  }
+
+  .font-mono-medium {
+    font-family: 'JetBrains Mono', monospace;
+    font-weight: 500;
+  }
+
+  /* Text color utilities */
+  .text-primary-contrast {
+    color: var(--color-primary-foreground);
+  }
+
+  .text-secondary-contrast {
+    color: var(--color-secondary-foreground);
+  }
+
+  .text-accent-contrast {
+    color: var(--color-accent-foreground);
+  }
+}
