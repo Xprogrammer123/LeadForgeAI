@@ -21,6 +21,7 @@ const DashboardLayout = ({ children, title, currentPath }) => {
   const navItems = [
     { path: '/dashboard', label: 'Dashboard', icon: 'BarChart3' },
     { path: '/campaigns', label: 'Campaigns', icon: 'Megaphone' },
+    { path: '/credits', label: 'Credits', icon: 'Coins' },
     { path: '/contacts', label: 'Contacts', icon: 'Users' },
     { path: '/settings', label: 'Settings', icon: 'Settings' }
   ];

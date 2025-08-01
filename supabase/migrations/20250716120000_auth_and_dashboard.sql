@@ -46,16 +46,6 @@ CREATE TABLE public.contacts (
     updated_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
 );
 
--- Campaign contacts junction table
-CREATE TABLE public.campaign_contacts (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    campaign_id UUID REFERENCES public.campaigns(id) ON DELETE CASCADE,
-    contact_id UUID REFERENCES public.contacts(id) ON DELETE CASCADE,
-    sent_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP,
-    opened_at TIMESTAMPTZ,
-    replied_at TIMESTAMPTZ,
-    UNIQUE(campaign_id, contact_id)
-);
 
 -- 2. Essential Indexes
 CREATE INDEX idx_user_profiles_email ON public.user_profiles(email);
@@ -63,14 +53,12 @@ CREATE INDEX idx_campaigns_user_id ON public.campaigns(user_id);
 CREATE INDEX idx_campaigns_status ON public.campaigns(status);
 CREATE INDEX idx_contacts_user_id ON public.contacts(user_id);
 CREATE INDEX idx_contacts_status ON public.contacts(status);
-CREATE INDEX idx_campaign_contacts_campaign_id ON public.campaign_contacts(campaign_id);
-CREATE INDEX idx_campaign_contacts_contact_id ON public.campaign_contacts(contact_id);
+
 
 -- 3. RLS Setup
 ALTER TABLE public.user_profiles ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.campaigns ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.contacts ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.campaign_contacts ENABLE ROW LEVEL SECURITY;
 
 -- 4. Helper Functions
 CREATE OR REPLACE FUNCTION public.is_owner(user_uuid UUID)
@@ -148,51 +136,6 @@ USING (public.owns_campaign(id)) WITH CHECK (user_id = auth.uid());
 CREATE POLICY "users_own_contacts" ON public.contacts FOR ALL
 TO authenticated
 USING (public.owns_contact(id)) WITH CHECK (user_id = auth.uid());
-
-CREATE POLICY "users_own_campaign_contacts" ON public.campaign_contacts FOR ALL
-TO authenticated
-USING (
-    EXISTS (
-        SELECT 1 FROM public.campaigns c
-        WHERE c.id = campaign_id AND c.user_id = auth.uid()
-    )
-)
-WITH CHECK (
-    EXISTS (
-        SELECT 1 FROM public.campaigns c
-        WHERE c.id = campaign_id AND c.user_id = auth.uid()
-    )
-);
-
--- 6. Mock Data
-DO $$
-DECLARE
-    admin_uuid UUID := gen_random_uuid();
-    user_uuid UUID := gen_random_uuid();
-    campaign_uuid UUID := gen_random_uuid();
-    contact1_uuid UUID := gen_random_uuid();
-    contact2_uuid UUID := gen_random_uuid();
-BEGIN
-    -- Create auth users with required fields
-    INSERT INTO auth.users (
-        id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
-        created_at, updated_at, raw_user_meta_data, raw_app_meta_data,
-        is_sso_user, is_anonymous, confirmation_token, confirmation_sent_at,
-        recovery_token, recovery_sent_at, email_change_token_new, email_change,
-        email_change_sent_at, email_change_token_current, email_change_confirm_status,
-        reauthentication_token, reauthentication_sent_at, phone, phone_change,
-        phone_change_token, phone_change_sent_at
-    ) VALUES
-        (admin_uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-         'admin@example.com', crypt('password123', gen_salt('bf', 10)), now(), now(), now(),
-         '{"full_name": "Admin User", "company_name": "Example Corp", "role": "admin"}'::jsonb, 
-         '{"provider": "email", "providers": ["email"]}'::jsonb,
-         false, false, '', null, '', null, '', '', null, '', 0, '', null, null, '', '', null),
-        (user_uuid, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-         'user@example.com', crypt('password123', gen_salt('bf', 10)), now(), now(), now(),
-         '{"full_name": "Regular User", "company_name": "Test Inc", "role": "member"}'::jsonb, 
-         '{"provider": "email", "providers": ["email"]}'::jsonb,
-         false, false, '', null, '', null, '', '', null, '', 0, '', null, null, '', '', null);
 
   
 

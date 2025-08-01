@@ -365,18 +365,7 @@ function ContactsPage() {
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex space-x-2">
-                          {lead.replied && lead.reply_intent === 'interested' && !lead.meeting_scheduled && (
-                            <Button
-                              size="sm"
-                              variant="default"
-                              onClick={() => handleScheduleMeeting(lead)}
-                              iconName="Calendar"
-                              iconPosition="left"
-                              className="cta-button"
-                            >
-                              Schedule
-                            </Button>
-                          )}
+                         
                           {lead.meetings?.length > 0 && (
                             <Button
                               size="sm"
@@ -388,17 +377,7 @@ function ContactsPage() {
                               Join Meeting
                             </Button>
                           )}
-                          {lead.reply_content && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => alert(lead.reply_content)} // TODO: Replace with proper modal
-                              iconName="MessageSquare"
-                              iconPosition="left"
-                            >
-                              View Reply
-                            </Button>
-                          )}
+                         
                         </div>
                       </td>
                     </tr>

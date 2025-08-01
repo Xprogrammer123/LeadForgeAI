@@ -20,18 +20,18 @@ const campaignService = {
       }
 
       // Transform data to include lead counts
-      const campaignsWithStats = data?.map(campaign => ({
+      const campaignsWithStats = data?.map((campaign) => ({
         ...campaign,
-        leads_generated: campaign.linkedin_leads?.[0]?.count || 0
+        leads_generated: campaign.linkedin_leads?.[0]?.count || 0,
       })) || [];
 
       return { success: true, data: campaignsWithStats };
     } catch (error) {
-      if (error?.message?.includes('Failed to fetch') || 
-          error?.message?.includes('NetworkError')) {
-        return { 
-          success: false, 
-          error: 'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.' 
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        return {
+          success: false,
+          error:
+            'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.',
         };
       }
       return { success: false, error: 'Failed to load campaigns' };
@@ -42,18 +42,18 @@ const campaignService = {
   createCampaign: async (campaignData) => {
     try {
       const userId = campaignData.user_id;
-      
+
       // Check if user has enough credits
       const creditCheck = await creditService.checkCreditSufficiency(userId, 20);
       if (!creditCheck.success) {
         return creditCheck;
       }
-      
+
       if (!creditCheck.data.hasEnoughCredits) {
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: `Insufficient credits. You need ${creditCheck.data.shortfall} more credits to create this campaign.`,
-          insufficientCredits: true
+          insufficientCredits: true,
         };
       }
 
@@ -65,30 +65,40 @@ const campaignService = {
 
       // Create campaign in Lix if filters are provided
       let lixCampaignId = null;
-      if (campaignData.target_job_titles || campaignData.target_industries || campaignData.target_locations) {
+      if (
+        campaignData.target_job_titles?.length > 0 ||
+        campaignData.target_industries?.length > 0 ||
+        campaignData.target_locations?.length > 0
+      ) {
         const lixResult = await lixService.createLixCampaign({
           name: campaignData.name,
           message: campaignData.message,
           target_job_titles: campaignData.target_job_titles || [],
           target_industries: campaignData.target_industries || [],
           target_locations: campaignData.target_locations || [],
-          message_template: campaignData.message_template || campaignData.message
+          message_template: campaignData.message_template || campaignData.message,
         });
-        
+
         if (lixResult.success) {
           lixCampaignId = lixResult.data.lixCampaignId;
+        } else {
+          // Refund credits if Lix campaign creation fails
+          await creditService.addCredits(userId, 20, null, 0);
+          return { success: false, error: `Failed to create Lix campaign: ${lixResult.error}` };
         }
       }
 
       // Create campaign in database
       const { data, error } = await supabase
         .from('campaigns')
-        .insert([{
-          ...campaignData,
-          lix_campaign_id: lixCampaignId,
-          credits_used: 20,
-          status: 'active' // Auto-start campaign
-        }])
+        .insert([
+          {
+            ...campaignData,
+            lix_campaign_id: lixCampaignId,
+            credits_used: 20,
+            status: 'active', // Auto-start campaign
+          },
+        ])
         .select()
         .single();
 
@@ -99,20 +109,20 @@ const campaignService = {
       }
 
       // Start lead generation process in background
-      this.generateLeadsForCampaign(data.id, {
+      await campaignService.generateLeadsForCampaign(data.id, {
         jobTitles: campaignData.target_job_titles,
         industries: campaignData.target_industries,
         locations: campaignData.target_locations,
-        limit: 50
+        limit: 50,
       });
 
       return { success: true, data };
     } catch (error) {
-      if (error?.message?.includes('Failed to fetch') || 
-          error?.message?.includes('NetworkError')) {
-        return { 
-          success: false, 
-          error: 'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.' 
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        return {
+          success: false,
+          error:
+            'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.',
         };
       }
       return { success: false, error: 'Failed to create campaign' };
@@ -134,19 +144,19 @@ const campaignService = {
         return { success: false, error: 'Campaign not found' };
       }
 
-      // Fetch leads from Lix API
+      // Fetch leads from Lix API via lixService (already uses proxy)
       const lixResult = await lixService.searchLeads(filters);
-      
+
       if (!lixResult.success) {
         console.error('Failed to fetch leads from Lix:', lixResult.error);
         return lixResult;
       }
 
       // Save leads to database
-      const leadsToInsert = lixResult.data.leads.map(lead => ({
+      const leadsToInsert = lixResult.data.leads.map((lead) => ({
         ...lead,
         campaign_id: campaignId,
-        user_id: campaign.user_id
+        user_id: campaign.user_id,
       }));
 
       if (leadsToInsert.length > 0) {
@@ -163,12 +173,12 @@ const campaignService = {
         await supabase.rpc('update_campaign_stats', { campaign_uuid: campaignId });
       }
 
-      return { 
-        success: true, 
-        data: { 
+      return {
+        success: true,
+        data: {
           leadsGenerated: leadsToInsert.length,
-          totalAvailable: lixResult.data.total 
-        } 
+          totalAvailable: lixResult.data.total,
+        },
       };
     } catch (error) {
       console.error('Error generating leads for campaign:', error);
@@ -208,7 +218,7 @@ const campaignService = {
             continue;
           }
 
-          // Send message via Lix API
+          // Send message via Lix API (already uses proxy)
           const sendResult = await lixService.sendLinkedInMessage(
             lead.lix_lead_id,
             messageResult.message,
@@ -221,17 +231,17 @@ const campaignService = {
               .from('linkedin_leads')
               .update({
                 message_sent: true,
-                message_sent_at: new Date().toISOString()
+                message_sent_at: new Date().toISOString(),
               })
               .eq('id', lead.id);
-            
+
             sentCount++;
           } else {
             failedCount++;
           }
 
           // Add delay to respect LinkedIn rate limits
-          await new Promise(resolve => setTimeout(resolve, 5000)); // 5 second delay
+          await new Promise((resolve) => setTimeout(resolve, 5000)); // 5 second delay
         } catch (leadError) {
           console.error(`Failed to send message to lead ${lead.id}:`, leadError);
           failedCount++;
@@ -243,8 +253,8 @@ const campaignService = {
         data: {
           messagesSent: sentCount,
           messagesFailed: failedCount,
-          totalProcessed: sentCount + failedCount
-        }
+          totalProcessed: sentCount + failedCount,
+        },
       };
     } catch (error) {
       console.error('Error sending campaign messages:', error);
@@ -267,18 +277,18 @@ const campaignService = {
         return { success: false, error: error.message };
       }
 
-      // Get inbox messages from Lix
+      // Get inbox messages from Lix via lixService (already uses proxy)
       const messagesResult = await lixService.getInboxMessages(campaignId);
-      
+
       if (!messagesResult.success) {
         return messagesResult;
       }
 
-      const replies = messagesResult.data.messages.filter(msg => msg.is_reply);
-      
+      const replies = messagesResult.data.messages.filter((msg) => msg.is_reply);
+
       for (const reply of replies) {
-        const lead = leads?.find(l => l.lix_lead_id === reply.sender_id);
-        
+        const lead = leads?.find((l) => l.lix_lead_id === reply.sender_id);
+
         if (lead) {
           // Analyze reply intent using AI
           const analysisResult = await openaiService.analyzeReplyIntent(
@@ -295,13 +305,12 @@ const campaignService = {
                 replied_at: reply.timestamp,
                 reply_content: reply.content,
                 reply_intent: analysisResult.analysis.intent,
-                ai_analysis: analysisResult.analysis
+                ai_analysis: analysisResult.analysis,
               })
               .eq('id', lead.id);
 
             // If interested, trigger meeting scheduling flow
             if (analysisResult.analysis.intent === 'interested') {
-              // This could trigger an email with scheduling link
               console.log(`Lead ${lead.full_name} showed interest - triggering scheduling flow`);
             }
 
@@ -315,7 +324,7 @@ const campaignService = {
                 reply_content: reply.content,
                 ai_analysis: analysisResult.analysis,
                 intent_score: analysisResult.analysis.confidence,
-                action_taken: analysisResult.analysis.suggested_action
+                action_taken: analysisResult.analysis.suggested_action,
               });
           }
         }
@@ -347,11 +356,11 @@ const campaignService = {
 
       return { success: true, data };
     } catch (error) {
-      if (error?.message?.includes('Failed to fetch') || 
-          error?.message?.includes('NetworkError')) {
-        return { 
-          success: false, 
-          error: 'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.' 
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        return {
+          success: false,
+          error:
+            'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.',
         };
       }
       return { success: false, error: 'Failed to update campaign' };
@@ -372,11 +381,11 @@ const campaignService = {
 
       return { success: true };
     } catch (error) {
-      if (error?.message?.includes('Failed to fetch') || 
-          error?.message?.includes('NetworkError')) {
-        return { 
-          success: false, 
-          error: 'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.' 
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        return {
+          success: false,
+          error:
+            'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.',
         };
       }
       return { success: false, error: 'Failed to delete campaign' };
@@ -415,18 +424,23 @@ const campaignService = {
 
       // Calculate stats
       const stats = {
-        totalLeads: totalLeads || campaigns?.reduce((sum, campaign) => sum + (campaign.leads_generated || 0), 0) || 0,
-        totalMeetings: totalMeetings || campaigns?.reduce((sum, campaign) => sum + (campaign.meetings_booked || 0), 0) || 0,
-        avgReplyRate: campaigns?.length > 0 ? campaigns.reduce((sum, campaign) => sum + (campaign.reply_rate || 0), 0) / campaigns.length : 0
+        totalLeads:
+          totalLeads || campaigns?.reduce((sum, campaign) => sum + (campaign.leads_generated || 0), 0) || 0,
+        totalMeetings:
+          totalMeetings || campaigns?.reduce((sum, campaign) => sum + (campaign.meetings_booked || 0), 0) || 0,
+        avgReplyRate:
+          campaigns?.length > 0
+            ? campaigns.reduce((sum, campaign) => sum + (campaign.reply_rate || 0), 0) / campaigns.length
+            : 0,
       };
 
       return { success: true, data: stats };
     } catch (error) {
-      if (error?.message?.includes('Failed to fetch') || 
-          error?.message?.includes('NetworkError')) {
-        return { 
-          success: false, 
-          error: 'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.' 
+      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
+        return {
+          success: false,
+          error:
+            'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.',
         };
       }
       return { success: false, error: 'Failed to load campaign stats' };
@@ -451,7 +465,7 @@ const campaignService = {
       console.error('Error getting campaign leads:', error);
       return { success: false, error: 'Failed to get campaign leads' };
     }
-  }
+  },
 };
 
 export default campaignService;

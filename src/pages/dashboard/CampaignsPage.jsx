@@ -5,9 +5,10 @@ import DashboardLayout from '../../components/dashboard/DashboardLayout';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Icon from '../../components/AppIcon';
-import campaignService from '../../utils/campaignService';
+import lixService from '../../utils/lixService';
 import creditService from '../../utils/creditService';
 import openaiService from '../../utils/openaiService';
+import campaignService from '../../utils/campaignService';
 
 function CampaignsPage() {
   const [campaigns, setCampaigns] = useState([]);
@@ -25,7 +26,7 @@ function CampaignsPage() {
     target_job_titles: [],
     target_industries: [],
     target_locations: [],
-    status: 'draft'
+    status: 'draft',
   });
   const { user } = useAuth();
 
@@ -37,8 +38,8 @@ function CampaignsPage() {
   const loadCampaigns = async () => {
     try {
       setLoading(true);
-      const result = await campaignService.getCampaigns();
-      
+      const result = await campaignService.getCampaigns(user?.id); // Pass user ID for filtering
+
       if (result?.success) {
         setCampaigns(result.data);
       } else {
@@ -68,24 +69,22 @@ function CampaignsPage() {
 
   const handleCreateCampaign = async (e) => {
     e.preventDefault();
-    
+
     if (creditBalance < 20) {
       setError('Insufficient credits. You need at least 20 credits to create a campaign.');
       return;
     }
 
     try {
-      // Debug user object to inspect metadata
       console.log('User object:', user);
 
-      // Safely extract name with multiple fallbacks
-      const firstName = user?.user_metadata?.name || 
-                       user?.email?.split('@')?.[0] || 
-                       (user?.id ? user.id.slice(0, 8) : 'Friend');
+      const firstName =
+        user?.user_metadata?.name ||
+        user?.email?.split('@')?.[0] ||
+        (user?.id ? user.id.slice(0, 8) : 'Friend');
       const company = user?.user_metadata?.company || 'Your Company';
       const jobTitle = user?.user_metadata?.jobTitle || 'Professional';
-      
-      // Process message template with safe defaults
+
       let processedMessage = newCampaign.message_template || '';
       processedMessage = processedMessage.replace(/\{\{firstName\}\}/g, firstName);
       processedMessage = processedMessage.replace(/\{\{company\}\}/g, company);
@@ -95,42 +94,64 @@ function CampaignsPage() {
         ...newCampaign,
         message: processedMessage,
         user_id: user?.id || '',
-        target_job_titles: newCampaign.target_job_titles.filter(t => t.trim()),
-        target_industries: newCampaign.target_industries.filter(t => t.trim()),
-        target_locations: newCampaign.target_locations.filter(t => t.trim())
+        target_job_titles: newCampaign.target_job_titles.filter((t) => t.trim()),
+        target_industries: newCampaign.target_industries.filter((t) => t.trim()),
+        target_locations: newCampaign.target_locations.filter((t) => t.trim()),
       };
-      
+
       if (!campaignData.user_id) {
         throw new Error('User ID is missing');
       }
 
-      const result = await campaignService.createCampaign(campaignData);
-      
-      if (result?.success) {
-        setCampaigns([result.data, ...campaigns]);
-        setNewCampaign({ 
-          name: '', 
-          subject: '', 
-          message: '', 
-          message_template: '',
-          target_job_titles: [],
-          target_industries: [],
-          target_locations: [],
-          status: 'draft' 
-        });
-        setShowModal(false);
-        setCreditBalance(prev => prev - 20);
-        setError(''); // Clear any previous errors
-      } else {
-        if (result?.insufficientCredits) {
-          setError(result.error + ' Please purchase more credits.');
-        } else {
-          setError(result?.error || 'Failed to create campaign');
-        }
+      const creditCheck = await creditService.checkCreditSufficiency(user.id, 20);
+      if (!creditCheck.success || !creditCheck.data.hasEnoughCredits) {
+        setError(`Insufficient credits. You need ${creditCheck.data.shortfall || 20} more credits.`);
+        return;
       }
+
+      const deductResult = await creditService.deductCredits(user.id, 20, `Campaign: ${campaignData.name}`);
+      if (!deductResult.success) {
+        setError('Failed to deduct credits');
+        return;
+      }
+
+      // Create campaign in Lix API
+      const lixResult = await lixService.createLixCampaign(campaignData);
+      if (!lixResult.success) {
+        await creditService.addCredits(user.id, 20, 'Campaign creation failed', 0); // Refund credits
+        throw new Error(lixResult.error || 'Failed to create Lix campaign');
+      }
+
+      // Store campaign in Supabase
+      const supabaseResult = await campaignService.createCampaign({
+        ...campaignData,
+        lix_campaign_id: lixResult.data.lixCampaignId,
+        credits_used: 20,
+        status: 'active', // Default to active after creation
+      });
+
+      if (!supabaseResult.success) {
+        await creditService.addCredits(user.id, 20, 'Supabase storage failed', 0); // Refund credits
+        throw new Error(supabaseResult.error || 'Failed to store campaign in Supabase');
+      }
+
+      setCampaigns([supabaseResult.data, ...campaigns]);
+      setNewCampaign({
+        name: '',
+        subject: '',
+        message: '',
+        message_template: '',
+        target_job_titles: [],
+        target_industries: [],
+        target_locations: [],
+        status: 'draft',
+      });
+      setShowModal(false);
+      setCreditBalance((prev) => prev - 20);
+      setError('');
     } catch (err) {
       console.error('Error in handleCreateCampaign:', err);
-      setError('An error occurred while creating the campaign: ' + err.message);
+      setError(`An error occurred while creating the campaign: ${err.message}`);
     }
   };
 
@@ -142,20 +163,22 @@ function CampaignsPage() {
 
     try {
       setGeneratingTemplate(true);
-      
+
       const result = await openaiService.generateCampaignTemplate(
         newCampaign.name,
-        `${newCampaign.target_job_titles.join(', ')} in ${newCampaign.target_industries.join(', ') || 'various industries'}`,
+        `${newCampaign.target_job_titles.join(', ')} in ${
+          newCampaign.target_industries.join(', ') || 'various industries'
+        }`,
         'AI-powered LinkedIn outreach platform'
       );
 
       if (result.success) {
-        setNewCampaign(prev => ({
+        setNewCampaign((prev) => ({
           ...prev,
           message_template: result.template,
-          message: result.template
+          message: result.template,
         }));
-        setError(''); // Clear any previous errors
+        setError('');
       } else {
         setError('Failed to generate template: ' + result.error);
       }
@@ -170,10 +193,10 @@ function CampaignsPage() {
   const handleSendMessages = async (campaignId) => {
     try {
       const result = await campaignService.sendCampaignMessages(campaignId);
-      
+
       if (result.success) {
         loadCampaigns();
-        setError(''); // Clear any previous errors
+        setError('');
       } else {
         setError('Failed to send messages: ' + result.error);
       }
@@ -186,12 +209,14 @@ function CampaignsPage() {
   const handleUpdateCampaignStatus = async (campaignId, newStatus) => {
     try {
       const result = await campaignService.updateCampaign(campaignId, { status: newStatus });
-      
+
       if (result?.success) {
-        setCampaigns(campaigns.map(campaign => 
-          campaign.id === campaignId ? { ...campaign, status: newStatus } : campaign
-        ));
-        setError(''); // Clear any previous errors
+        setCampaigns(
+          campaigns.map((campaign) =>
+            campaign.id === campaignId ? { ...campaign, status: newStatus } : campaign
+          )
+        );
+        setError('');
       } else {
         setError(result?.error || 'Failed to update campaign status');
       }
@@ -208,10 +233,10 @@ function CampaignsPage() {
 
     try {
       const result = await campaignService.deleteCampaign(campaignId);
-      
+
       if (result?.success) {
-        setCampaigns(campaigns.filter(campaign => campaign.id !== campaignId));
-        setError(''); // Clear any previous errors
+        setCampaigns(campaigns.filter((campaign) => campaign.id !== campaignId));
+        setError('');
       } else {
         setError(result?.error || 'Failed to delete campaign');
       }
@@ -221,33 +246,38 @@ function CampaignsPage() {
     }
   };
 
-  const filteredCampaigns = campaigns.filter(campaign =>
-    campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    campaign.subject.toLowerCase().includes(searchTerm.toLowerCase())
+  const filteredCampaigns = campaigns.filter(
+    (campaign) =>
+      campaign.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      campaign.subject.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const getStatusColor = (status) => {
     switch (status) {
-      case 'active': return 'bg-success/20 text-success border-success/30';
-      case 'paused': return 'bg-warning/20 text-warning border-warning/30';
-      case 'draft': return 'bg-muted/20 text-muted-foreground border-muted/30';
-      default: return 'bg-muted/20 text-muted-foreground border-muted/30';
+      case 'active':
+        return 'bg-success/20 text-success border-success/30';
+      case 'paused':
+        return 'bg-warning/20 text-warning border-warning/30';
+      case 'draft':
+        return 'bg-muted/20 text-muted-foreground border-muted/30';
+      default:
+        return 'bg-muted/20 text-muted-foreground border-muted/30';
     }
   };
 
   const addTargetItem = (field, value) => {
     if (value.trim()) {
-      setNewCampaign(prev => ({
+      setNewCampaign((prev) => ({
         ...prev,
-        [field]: [...prev[field], value.trim()]
+        [field]: [...prev[field], value.trim()],
       }));
     }
   };
 
   const removeTargetItem = (field, index) => {
-    setNewCampaign(prev => ({
+    setNewCampaign((prev) => ({
       ...prev,
-      [field]: prev[field].filter((_, i) => i !== index)
+      [field]: prev[field].filter((_, i) => i !== index),
     }));
   };
 
@@ -267,9 +297,7 @@ function CampaignsPage() {
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <h2 className="text-2xl font-headline-bold text-foreground">
-              Campaign Management
-            </h2>
+            <h2 className="text-2xl font-headline-bold text-foreground">Campaign Management</h2>
             <p className="text-muted-foreground font-body">
               Create and manage your AI SDR campaigns • {creditBalance} credits available
             </p>
@@ -282,7 +310,7 @@ function CampaignsPage() {
             iconPosition="left"
             disabled={creditBalance < 20}
           >
-            New Campaign (20 credits)
+            Add Campaign
           </Button>
         </div>
 
@@ -312,11 +340,9 @@ function CampaignsPage() {
           className="glassmorphism rounded-xl overflow-hidden"
         >
           <div className="p-6 border-b border-border">
-            <h3 className="text-lg font-headline-bold text-foreground">
-              Your Campaigns
-            </h3>
+            <h3 className="text-lg font-headline-bold text-foreground">Your Campaigns</h3>
           </div>
-          
+
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
@@ -352,33 +378,44 @@ function CampaignsPage() {
                 ) : filteredCampaigns.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="py-8 text-center">
-                      <Icon name="Inbox" size={48} color="var(--color-muted-foreground)" className="mx-auto mb-2" />
+                      <Icon
+                        name="Inbox"
+                        size={48}
+                        color="var(--color-muted-foreground)"
+                        className="mx-auto mb-2"
+                      />
                       <p className="text-muted-foreground font-body-medium">
-                        {creditBalance < 20 ? 'Purchase credits to create your first campaign' : 'No campaigns found'}
+                        {creditBalance < 20
+                          ? 'Purchase credits to create your first campaign'
+                          : 'No campaigns found'}
                       </p>
                     </td>
                   </tr>
                 ) : (
                   filteredCampaigns.map((campaign) => (
-                    <tr key={campaign.id} className="border-b border-border hover:bg-muted/5 transition-colors">
+                    <tr
+                      key={campaign.id}
+                      className="border-b border-border hover:bg-muted/5 transition-colors"
+                    >
                       <td className="py-4 px-6">
                         <div>
-                          <div className="font-body-semibold text-foreground">
-                            {campaign.name}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {campaign.subject}
-                          </div>
+                          <div className="font-body-semibold text-foreground">{campaign.name}</div>
+                          <div className="text-sm text-muted-foreground">{campaign.subject}</div>
                           {campaign.target_job_titles?.length > 0 && (
                             <div className="text-xs text-muted-foreground mt-1">
                               Targeting: {campaign.target_job_titles.slice(0, 2).join(', ')}
-                              {campaign.target_job_titles.length > 2 && ` +${campaign.target_job_titles.length - 2} more`}
+                              {campaign.target_job_titles.length > 2 &&
+                                ` +${campaign.target_job_titles.length - 2} more`}
                             </div>
                           )}
                         </div>
                       </td>
                       <td className="py-4 px-6">
-                        <span className={`px-3 py-1 text-xs font-body-medium rounded-full border ${getStatusColor(campaign.status)}`}>
+                        <span
+                          className={`px-3 py-1 text-xs font-body-medium rounded-full border ${getStatusColor(
+                            campaign.status
+                          )}`}
+                        >
                           {campaign.status}
                         </span>
                       </td>
@@ -393,22 +430,15 @@ function CampaignsPage() {
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex space-x-2">
-                          {campaign.status === 'active' && (
-                            <Button
-                              size="sm"
-                              variant="secondary"
-                              onClick={() => handleSendMessages(campaign.id)}
-                            >
-                              Send Messages
-                            </Button>
-                          )}
                           <Button
                             size="sm"
                             variant="outline"
-                            onClick={() => handleUpdateCampaignStatus(
-                              campaign.id, 
-                              campaign.status === 'active' ? 'paused' : 'active'
-                            )}
+                            onClick={() =>
+                              handleUpdateCampaignStatus(
+                                campaign.id,
+                                campaign.status === 'active' ? 'paused' : 'active'
+                              )
+                            }
                           >
                             {campaign.status === 'active' ? 'Pause' : 'Resume'}
                           </Button>
@@ -451,7 +481,7 @@ function CampaignsPage() {
                 iconName="X"
               />
             </div>
-            
+
             <form onSubmit={handleCreateCampaign} className="space-y-6">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -462,11 +492,13 @@ function CampaignsPage() {
                     type="text"
                     required
                     value={newCampaign.name}
-                    onChange={(e) => setNewCampaign({...newCampaign, name: e.target.value})}
+                    onChange={(e) =>
+                      setNewCampaign({ ...newCampaign, name: e.target.value })
+                    }
                     placeholder="Enter campaign name"
                   />
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-body-semibold text-foreground mb-2">
                     Subject Line *
@@ -475,7 +507,9 @@ function CampaignsPage() {
                     type="text"
                     required
                     value={newCampaign.subject}
-                    onChange={(e) => setNewCampaign({...newCampaign, subject: e.target.value})}
+                    onChange={(e) =>
+                      setNewCampaign({ ...newCampaign, subject: e.target.value })
+                    }
                     placeholder="Enter subject line"
                   />
                 </div>
@@ -484,14 +518,17 @@ function CampaignsPage() {
               {/* LinkedIn Targeting */}
               <div className="space-y-4">
                 <h4 className="text-md font-headline-bold text-foreground">LinkedIn Targeting</h4>
-                
+
                 <div>
                   <label className="block text-sm font-body-semibold text-foreground mb-2">
                     Target Job Titles
                   </label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {newCampaign.target_job_titles.map((title, index) => (
-                      <span key={index} className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm flex items-center gap-2">
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-primary/10 text-primary rounded-full text-sm flex items-center gap-2"
+                      >
                         {title}
                         <button
                           type="button"
@@ -522,7 +559,10 @@ function CampaignsPage() {
                   </label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {newCampaign.target_industries.map((industry, index) => (
-                      <span key={index} className="px-3 py-1 bg-secondary/10 text-secondary rounded-full text-sm flex items-center gap-2">
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-secondary/10 text-secondary rounded-full text-sm flex items-center gap-2"
+                      >
                         {industry}
                         <button
                           type="button"
@@ -553,7 +593,10 @@ function CampaignsPage() {
                   </label>
                   <div className="flex flex-wrap gap-2 mb-2">
                     {newCampaign.target_locations.map((location, index) => (
-                      <span key={index} className="px-3 py-1 bg-accent/10 text-accent rounded-full text-sm flex items-center gap-2">
+                      <span
+                        key={index}
+                        className="px-3 py-1 bg-accent/10 text-accent rounded-full text-sm flex items-center gap-2"
+                      >
                         {location}
                         <button
                           type="button"
@@ -578,7 +621,7 @@ function CampaignsPage() {
                   />
                 </div>
               </div>
-              
+
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="block text-sm font-body-semibold text-foreground">
@@ -600,19 +643,21 @@ function CampaignsPage() {
                   required
                   rows={6}
                   value={newCampaign.message_template}
-                  onChange={(e) => setNewCampaign({
-                    ...newCampaign,
-                    message_template: e.target.value,
-                    message: e.target.value
-                  })}
+                  onChange={(e) =>
+                    setNewCampaign({
+                      ...newCampaign,
+                      message_template: e.target.value,
+                      message: e.target.value,
+                    })
+                  }
                   placeholder="Enter your LinkedIn message template. Use {{firstName}}, {{company}}, {{jobTitle}} for personalization."
                   className="w-full px-3 py-2 bg-input border border-border rounded-md text-foreground placeholder-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary focus:border-transparent"
                 />
                 <p className="text-xs text-muted-foreground mt-1">
-                  Tip: Use placeholders like firstName , company , jobTitle for AI personalization
+                  Tip: Use placeholders like firstName, company, jobTitle for AI personalization
                 </p>
               </div>
-              
+
               <div className="flex justify-end space-x-3 pt-4 border-t">
                 <Button
                   type="button"
@@ -627,7 +672,7 @@ function CampaignsPage() {
                   className="cta-button"
                   disabled={creditBalance < 20}
                 >
-                  Create Campaign (20 credits)
+                  Create Campaign
                 </Button>
               </div>
             </form>

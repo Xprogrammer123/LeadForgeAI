@@ -1,5 +1,5 @@
 {
-  "name": "agenticai-sdr",
+  "name": "LeadForge",
   "version": "0.1.0",
   "private": true,
   "rocketCritical": {
@@ -23,8 +23,7 @@
       "start",
       "build",
       "serve"
-    ],
-    "warning": "🚨 CRITICAL: DO NOT REMOVE OR MODIFY ABOVE DEPENDENCIES - Required for app functionality"
+    ]
   },
   "dependencies": {
     "@dhiwise/component-tagger": "^1.0.10",

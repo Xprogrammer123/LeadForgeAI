@@ -1,19 +1,20 @@
 import React from "react";
 import { BrowserRouter, Routes as RouterRoutes, Route } from "react-router-dom";
-import ScrollToTop from "components/ScrollToTop";
-import ErrorBoundary from "components/ErrorBoundary";
-import { AuthProvider } from "contexts/AuthContext";
-import ProtectedRoute from "components/dashboard/ProtectedRoute";
+import ScrollToTop from "./components/ScrollToTop";
+import ErrorBoundary from "./components/ErrorBoundary";
+import { AuthProvider } from "./contexts/AuthContext";
+import ProtectedRoute from "./components/dashboard/ProtectedRoute";
 // Add your imports here
-import LandingPage from "pages/landing-page";
-import NotFound from "pages/NotFound";
-import LoginPage from "pages/auth/LoginPage";
-import SignupPage from "pages/auth/SignupPage";
-import ForgotPasswordPage from "pages/auth/ForgotPasswordPage";
-import DashboardPage from "pages/dashboard/DashboardPage";
-import CampaignsPage from "pages/dashboard/CampaignsPage";
-import ContactsPage from "pages/dashboard/ContactsPage";
-import SettingsPage from "pages/dashboard/SettingsPage";
+import LandingPage from "./pages/landing-page";
+import NotFound from "./pages/NotFound";
+import LoginPage from "./pages/auth/LoginPage";
+import SignupPage from "./pages/auth/SignupPage";
+import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
+import DashboardPage from "./pages/dashboard/DashboardPage";
+import CampaignsPage from "./pages/dashboard/CampaignsPage";
+import ContactsPage from "./pages/dashboard/ContactsPage";
+import SettingsPage from "./pages/dashboard/SettingsPage";
+import CreditsPage from "./pages/dashboard/CreditsPage"
 
 const Routes = () => {
   return (
@@ -41,6 +42,11 @@ const Routes = () => {
             <Route path="/contacts" element={
               <ProtectedRoute>
                 <ContactsPage />
+              </ProtectedRoute>
+            } />
+            <Route path="/credits" element={
+              <ProtectedRoute>
+                <CreditsPage />
               </ProtectedRoute>
             } />
             <Route path="/settings" element={

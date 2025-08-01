@@ -4,11 +4,10 @@ import { motion } from 'framer-motion';
 import DashboardLayout from '../../components/dashboard/DashboardLayout';
 import StatCard from '../../components/dashboard/StatCard';
 import Button from '../../components/ui/Button';
-
 import creditService from '../../utils/creditService';
 import stripeService from '../../utils/stripeService';
 import StripePaymentForm from '../../components/payments/StripePaymentForm';
-import { Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Area, AreaChart } from 'recharts';
+import { Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart } from 'recharts';
 import Icon from '../../components/AppIcon';
 import { supabase } from '../../utils/supabase';
 
@@ -16,7 +15,7 @@ function DashboardPage() {
   const [stats, setStats] = useState({
     totalLeads: 0,
     totalMeetings: 0,
-    avgReplyRate: 0
+    totalReplies: 0
   });
   const [creditBalance, setCreditBalance] = useState(0);
   const [creditStats, setCreditStats] = useState({
@@ -33,8 +32,8 @@ function DashboardPage() {
   const [showPaymentForm, setShowPaymentForm] = useState(false);
   const { user } = useAuth();
 
-  // Chart data for credit transactions over time
-  const [creditChartData, setCreditChartData] = useState([]);
+  // Chart data for leads, replies, and meetings over time
+  const [activityChartData, setActivityChartData] = useState([]);
 
   useEffect(() => {
     loadDashboardData();
@@ -43,49 +42,65 @@ function DashboardPage() {
   const loadDashboardData = async () => {
     try {
       setLoading(true);
-      
-      // Load campaign stats - get leads generated, meetings booked, and replies
+
+      // Load campaign stats - get leads, meetings, and replies with date grouping
+      const thirtyDaysAgo = new Date();
+      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
       const [leadsResult, meetingsResult, repliesResult] = await Promise.all([
-        // Get leads generated count
-        supabase.from('linkedin_leads').select('*', { count: 'exact', head: true }),
-        // Get meetings booked count
-        supabase.from('meetings').select('*', { count: 'exact', head: true }),
-        // Get replies count
-        supabase.from('linkedin_leads').select('*', { count: 'exact', head: true }).eq('replied', true)
+        // Get leads with date grouping
+        supabase
+          .from('linkedin_leads')
+          .select('created_at', { count: 'exact' })
+          .gte('created_at', thirtyDaysAgo.toISOString())
+          .order('created_at', { ascending: true }),
+        // Get meetings with date grouping
+        supabase
+          .from('meetings')
+          .select('created_at', { count: 'exact' })
+          .gte('created_at', thirtyDaysAgo.toISOString())
+          .order('created_at', { ascending: true }),
+        // Get replies with date grouping
+        supabase
+          .from('linkedin_leads')
+          .select('created_at', { count: 'exact' })
+          .eq('replied', true)
+          .gte('created_at', thirtyDaysAgo.toISOString())
+          .order('created_at', { ascending: true })
       ]);
 
       const newStats = {
-        totalLeads: leadsResult?.count || 0,
-        totalMeetings: meetingsResult?.count || 0,
-        totalReplies: repliesResult?.count || 0
+        totalLeads: leadsResult?.data?.length || 0,
+        totalMeetings: meetingsResult?.data?.length || 0,
+        totalReplies: repliesResult?.data?.length || 0
       };
       setStats(newStats);
 
+      // Transform data for chart
+      const chartData = transformActivityToChartData(
+        leadsResult?.data || [],
+        meetingsResult?.data || [],
+        repliesResult?.data || []
+      );
+      setActivityChartData(chartData);
+
       // Load credit data if user is available
       if (user?.id) {
-        // Load credit balance (now calculated from all purchases)
         const creditResult = await creditService.getCreditBalance(user.id);
         if (creditResult?.success) {
           setCreditBalance(creditResult.data.credits);
         }
 
-        // Load credit statistics for the last 30 days
         const creditStatsResult = await creditService.getCreditStats(user.id, '30_days');
         if (creditStatsResult?.success) {
           setCreditStats(creditStatsResult.data);
         }
 
-        // Load credit transaction history for chart
         const transactionsResult = await creditService.getCreditTransactions(user.id, 30);
         if (transactionsResult?.success) {
           setTransactionHistory(transactionsResult.data);
-          
-          // Transform transaction data for chart display
-          const chartData = transformTransactionsToChartData(transactionsResult.data);
-          setCreditChartData(chartData);
         }
       }
-
     } catch (err) {
       setError('Failed to load dashboard data');
     } finally {
@@ -93,16 +108,11 @@ function DashboardPage() {
     }
   };
 
-  // Transform credit transactions into chart-friendly format
-  const transformTransactionsToChartData = (transactions) => {
-    if (!transactions?.length) {
-      return [];
-    }
-
-    // Group transactions by date
-    const groupedByDate = {};
+  // Transform leads, meetings, and replies into chart-friendly format
+  const transformActivityToChartData = (leads, meetings, replies) => {
     const last30Days = [];
-    
+    const groupedByDate = {};
+
     // Create array of last 30 days
     for (let i = 29; i >= 0; i--) {
       const date = new Date();
@@ -111,47 +121,37 @@ function DashboardPage() {
       last30Days.push(dateKey);
       groupedByDate[dateKey] = {
         date: dateKey,
-        purchase: 0,
-        usage: 0,
-        balance: 0,
+        leads: 0,
+        meetings: 0,
+        replies: 0,
         day: date.getDate()
       };
     }
 
-    // Process transactions and calculate running balance
-    let runningBalance = creditBalance;
-    
-    // Sort transactions by date ascending to calculate balance progression
-    const sortedTransactions = [...transactions].sort((a, b) => 
-      new Date(a.created_at) - new Date(b.created_at)
-    );
-
-    // Calculate starting balance by working backwards from current balance
-    sortedTransactions.forEach(transaction => {
-      if (transaction.transaction_type === 'purchase') {
-        runningBalance -= transaction.credits_amount;
-      } else if (transaction.transaction_type === 'deduction') {
-        runningBalance += transaction.credits_amount;
+    // Count leads by date
+    leads.forEach(lead => {
+      const dateKey = new Date(lead.created_at).toISOString().split('T')[0];
+      if (groupedByDate[dateKey]) {
+        groupedByDate[dateKey].leads += 1;
       }
     });
 
-    // Now process transactions forward to build chart data
-    sortedTransactions.forEach(transaction => {
-      const transactionDate = new Date(transaction.created_at).toISOString().split('T')[0];
-      
-      if (groupedByDate[transactionDate]) {
-        if (transaction.transaction_type === 'purchase') {
-          groupedByDate[transactionDate].purchase += transaction.credits_amount;
-          runningBalance += transaction.credits_amount;
-        } else if (transaction.transaction_type === 'deduction') {
-          groupedByDate[transactionDate].usage += transaction.credits_amount;
-          runningBalance -= transaction.credits_amount;
-        }
-        groupedByDate[transactionDate].balance = Math.max(0, runningBalance);
+    // Count meetings by date
+    meetings.forEach(meeting => {
+      const dateKey = new Date(meeting.created_at).toISOString().split('T')[0];
+      if (groupedByDate[dateKey]) {
+        groupedByDate[dateKey].meetings += 1;
       }
     });
 
-    // Convert to array format for chart
+    // Count replies by date
+    replies.forEach(reply => {
+      const dateKey = new Date(reply.created_at).toISOString().split('T')[0];
+      if (groupedByDate[dateKey]) {
+        groupedByDate[dateKey].replies += 1;
+      }
+    });
+
     return last30Days.map(dateKey => groupedByDate[dateKey]);
   };
 
@@ -162,13 +162,10 @@ function DashboardPage() {
 
   const handlePaymentSuccess = async (paymentIntent) => {
     try {
-      // Refresh all dashboard data after successful payment
       await loadDashboardData();
       setShowPaymentForm(false);
       setShowCreditModal(false);
       setSelectedCreditPackage(null);
-      
-      // Clear any existing errors
       setError('');
     } catch (err) {
       console.error('Error refreshing data after payment:', err);
@@ -193,18 +190,14 @@ function DashboardPage() {
           <p className="text-sm font-body-medium text-foreground mb-2">
             Day {label}
           </p>
-          {data.purchase > 0 && (
-            <p className="text-xs text-success">
-              Purchased: +{data.purchase} credits
-            </p>
-          )}
-          {data.usage > 0 && (
-            <p className="text-xs text-warning">
-              Used: -{data.usage} credits
-            </p>
-          )}
-          <p className="text-xs text-primary font-semibold">
-            Balance: {data.balance} credits
+          <p className="text-xs text-lime-500">
+            Leads: {data.leads}
+          </p>
+          <p className="text-xs text-yellow-400">
+            Replies: {data.replies}
+          </p>
+          <p className="text-xs text-green-400">
+            Meetings: {data.meetings}
           </p>
         </div>
       );
@@ -303,7 +296,7 @@ function DashboardPage() {
           </div>
         </motion.div>
 
-        {/* KPI Cards - Updated with Real Data */}
+        {/* KPI Cards */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
           <StatCard
             title="Credit Balance"
@@ -338,7 +331,7 @@ function DashboardPage() {
           />
         </div>
 
-        {/* Credit Activity Chart */}
+        {/* Campaign Activity Chart */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -346,18 +339,12 @@ function DashboardPage() {
           className="glassmorphism rounded-xl p-6"
         >
           <h3 className="text-lg font-headline-bold text-foreground mb-6">
-            Credit Activity - Last 30 Days
+            Campaign Activity - Last 30 Days
           </h3>
           <div className="h-80">
-            {creditChartData.length > 0 ? (
+            {activityChartData.length > 0 ? (
               <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={creditChartData}>
-                  <defs>
-                    <linearGradient id="balanceGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="var(--color-primary)" stopOpacity={0.3}/>
-                      <stop offset="95%" stopColor="var(--color-primary)" stopOpacity={0.1}/>
-                    </linearGradient>
-                  </defs>
+                <LineChart data={activityChartData}>
                   <CartesianGrid strokeDasharray="3 3" stroke="var(--color-border)" />
                   <XAxis 
                     dataKey="day" 
@@ -369,27 +356,28 @@ function DashboardPage() {
                     stroke="var(--color-border)"
                   />
                   <Tooltip content={<CustomTooltip />} />
-                  <Area 
+                  <Line 
                     type="monotone"
-                    dataKey="balance" 
-                    stroke="var(--color-primary)"
-                    fillOpacity={1}
-                    fill="url(#balanceGradient)"
+                    dataKey="leads" 
+                    stroke="#84cc16" // Tailwind lime-500
                     strokeWidth={2}
+                    dot={false}
                   />
-                  <Bar 
-                    dataKey="purchase" 
-                    fill="var(--color-success)"
-                    opacity={0.7}
-                    radius={[2, 2, 0, 0]}
+                  <Line 
+                    type="monotone"
+                    dataKey="replies" 
+                    stroke="#facc15" // Tailwind yellow-400
+                    strokeWidth={2}
+                    dot={false}
                   />
-                  <Bar 
-                    dataKey="usage" 
-                    fill="var(--color-warning)"
-                    opacity={0.7}
-                    radius={[2, 2, 0, 0]}
+                  <Line 
+                    type="monotone"
+                    dataKey="meetings" 
+                    stroke="#4ade80" // Tailwind green-400
+                    strokeWidth={2}
+                    dot={false}
                   />
-                </AreaChart>
+                </LineChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-full flex items-center justify-center">
@@ -398,10 +386,10 @@ function DashboardPage() {
                     <Icon name="BarChart3" size={32} color="var(--color-muted-foreground)" />
                   </div>
                   <p className="text-muted-foreground font-body-medium">
-                    No credit activity yet
+                    No campaign activity yet
                   </p>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Purchase credits or create campaigns to see your activity here
+                    Create campaigns to see your leads, replies, and meetings here
                   </p>
                 </div>
               </div>
@@ -517,7 +505,7 @@ function DashboardPage() {
             </Button>
             <Button
               onClick={() => setShowCreditModal(true)}
-              variant="outline"
+              variant="outline"npm start
               className="justify-start"
               iconName="CreditCard"
               iconPosition="left"
@@ -537,7 +525,7 @@ function DashboardPage() {
         </motion.div>
       </div>
 
-      {/* Enhanced Credit Purchase Modal */}
+      {/* Credit Purchase Modal */}
       {showCreditModal && (
         <div className="fixed inset-0 bg-background/80 backdrop-blur-sm flex items-center justify-center z-50">
           <motion.div
