@@ -108,15 +108,38 @@ const campaignService = {
         return { success: false, error: error.message };
       }
 
-      // Start lead generation process in background
-      await campaignService.generateLeadsForCampaign(data.id, {
+      // Immediately start lead generation process
+      const leadGenerationResult = await campaignService.generateLeadsForCampaign(data.id, {
         jobTitles: campaignData.target_job_titles,
         industries: campaignData.target_industries,
         locations: campaignData.target_locations,
         limit: 50,
       });
 
-      return { success: true, data };
+      // Update campaign data with lead generation results
+      const updatedCampaign = {
+        ...data,
+        leads_generated: leadGenerationResult.success ? leadGenerationResult.data.leadsGenerated : 0,
+        lead_generation_status: leadGenerationResult.success ? 'completed' : 'failed',
+        lead_generation_error: leadGenerationResult.success ? null : leadGenerationResult.error,
+      };
+
+      // Update campaign stats in database
+      if (leadGenerationResult.success && leadGenerationResult.data.leadsGenerated > 0) {
+        await supabase
+          .from('campaigns')
+          .update({
+            leads_generated: leadGenerationResult.data.leadsGenerated,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', data.id);
+      }
+
+      return { 
+        success: true, 
+        data: updatedCampaign,
+        leadGeneration: leadGenerationResult
+      };
     } catch (error) {
       if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
         return {
@@ -132,6 +155,8 @@ const campaignService = {
   // Generate leads for campaign using Lix API
   generateLeadsForCampaign: async (campaignId, filters) => {
     try {
+      console.log('Starting lead generation for campaign:', campaignId, 'with filters:', filters);
+
       // Get campaign details
       const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
@@ -144,33 +169,92 @@ const campaignService = {
         return { success: false, error: 'Campaign not found' };
       }
 
-      // Fetch leads from Lix API via lixService (already uses proxy)
+      // Update campaign status to indicate lead generation is in progress
+      await supabase
+        .from('campaigns')
+        .update({ 
+          status: 'generating_leads',
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', campaignId);
+
+      // Fetch leads from Lix API with enhanced error handling
+      console.log('Fetching leads from Lix API...');
       const lixResult = await lixService.searchLeads(filters);
 
       if (!lixResult.success) {
         console.error('Failed to fetch leads from Lix:', lixResult.error);
-        return lixResult;
+        
+        // Update campaign status to failed
+        await supabase
+          .from('campaigns')
+          .update({ 
+            status: 'failed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', campaignId);
+          
+        return { 
+          success: false, 
+          error: `Lix API Error: ${lixResult.error}`,
+          retryable: true
+        };
       }
 
-      // Save leads to database
+      console.log(`Fetched ${lixResult.data.leads.length} leads from Lix API`);
+
+      // Transform and prepare leads for database insertion
       const leadsToInsert = lixResult.data.leads.map((lead) => ({
         ...lead,
         campaign_id: campaignId,
         user_id: campaign.user_id,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
       }));
 
       if (leadsToInsert.length > 0) {
+        console.log(`Inserting ${leadsToInsert.length} leads into database...`);
+        
         const { error: insertError } = await supabase
           .from('linkedin_leads')
           .insert(leadsToInsert);
 
         if (insertError) {
           console.error('Failed to save leads:', insertError);
-          return { success: false, error: 'Failed to save leads' };
+          
+          // Update campaign status to failed
+          await supabase
+            .from('campaigns')
+            .update({ 
+              status: 'failed',
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', campaignId);
+            
+          return { success: false, error: 'Failed to save leads to database' };
         }
 
-        // Update campaign stats
-        await supabase.rpc('update_campaign_stats', { campaign_uuid: campaignId });
+        // Update campaign with successful lead generation
+        await supabase
+          .from('campaigns')
+          .update({
+            status: 'active',
+            leads_generated: leadsToInsert.length,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', campaignId);
+
+        console.log(`Successfully generated ${leadsToInsert.length} leads for campaign ${campaignId}`);
+      } else {
+        // No leads found but API call was successful
+        await supabase
+          .from('campaigns')
+          .update({
+            status: 'active',
+            leads_generated: 0,
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', campaignId);
       }
 
       return {
@@ -178,11 +262,31 @@ const campaignService = {
         data: {
           leadsGenerated: leadsToInsert.length,
           totalAvailable: lixResult.data.total,
+          hasMore: lixResult.data.hasMore,
+          campaignId: campaignId,
         },
       };
     } catch (error) {
       console.error('Error generating leads for campaign:', error);
-      return { success: false, error: 'Failed to generate leads' };
+      
+      // Update campaign status to failed
+      try {
+        await supabase
+          .from('campaigns')
+          .update({ 
+            status: 'failed',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', campaignId);
+      } catch (updateError) {
+        console.error('Failed to update campaign status:', updateError);
+      }
+      
+      return { 
+        success: false, 
+        error: 'Failed to generate leads: ' + error.message,
+        retryable: true
+      };
     }
   },
 

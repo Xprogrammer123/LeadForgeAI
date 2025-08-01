@@ -55,8 +55,11 @@ const lixService = {
    */
   searchLeads: async (filters) => {
     try {
+      console.log('Lix API: Starting lead search with filters:', filters);
+      
       const apiKey = validateApiKey();
 
+      // Build query parameters with enhanced filtering
       const queryParams = new URLSearchParams({
         job_titles: filters.jobTitles?.join(',') || '',
         industries: filters.industries?.join(',') || '',
@@ -64,48 +67,88 @@ const lixService = {
         company_sizes: filters.companySizes?.join(',') || '',
         experience_levels: filters.experienceLevels?.join(',') || '',
         limit: filters.limit || 50,
+        include_email: 'true', // Request email data if available
+        include_phone: 'true', // Request phone data if available
+        verified_only: 'false', // Include both verified and unverified leads
       });
 
+      console.log('Lix API: Making request to /leads/search with params:', queryParams.toString());
+
+      const startTime = Date.now();
       const response = await fetchWithRetry(`/leads/search?${queryParams}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
+          'X-Request-Source': 'leadforge-campaign-creation',
         },
       });
 
+      const responseTime = Date.now() - startTime;
+      console.log(`Lix API: Response received in ${responseTime}ms, status: ${response.status}`);
+
       if (!response.ok) {
         let errorMessage = 'Failed to search leads';
+        let errorDetails = null;
+        
         try {
           const error = await response.json();
           errorMessage = error.message || errorMessage;
+          errorDetails = error.details || null;
+          console.error('Lix API Error Response:', error);
         } catch (e) {
           errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+          console.error('Lix API: Failed to parse error response:', e);
         }
-        return { success: false, error: errorMessage };
+        
+        return { 
+          success: false, 
+          error: errorMessage,
+          details: errorDetails,
+          statusCode: response.status
+        };
       }
 
       const data = await response.json();
+      console.log('Lix API: Raw response data:', {
+        leadsCount: data.leads?.length || 0,
+        total: data.total,
+        hasMore: data.hasMore
+      });
 
-      // Transform Lix API response to our format
-      const leads = data.leads?.map((lead) => ({
-        full_name: lead.name || `${lead.firstName} ${lead.lastName}`,
-        job_title: lead.jobTitle,
-        company: lead.companyName,
-        location: lead.location,
-        linkedin_url: lead.linkedinUrl,
-        email: lead.email,
-        phone: lead.phone,
-        profile_image_url: lead.profileImageUrl,
-        lix_lead_id: lead.id,
-        lead_data: {
-          industry: lead.industry,
-          companySize: lead.companySize,
-          experience: lead.experience,
-          connections: lead.connections,
-          verified: lead.verified,
-        },
-      })) || [];
+      // Transform Lix API response to our format with enhanced data mapping
+      const leads = data.leads?.map((lead, index) => {
+        console.log(`Lix API: Processing lead ${index + 1}:`, {
+          name: lead.name,
+          jobTitle: lead.jobTitle,
+          company: lead.companyName
+        });
+
+        return {
+          full_name: lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || `Lead ${index + 1}`,
+          job_title: lead.jobTitle || lead.position || 'Unknown Position',
+          company: lead.companyName || lead.company || 'Unknown Company',
+          location: lead.location || lead.city || lead.country || 'Unknown Location',
+          linkedin_url: lead.linkedinUrl || lead.profileUrl || '',
+          email: lead.email || lead.emailAddress || null,
+          phone: lead.phone || lead.phoneNumber || null,
+          profile_image_url: lead.profileImageUrl || lead.avatarUrl || null,
+          lix_lead_id: lead.id || lead.leadId || `temp_${Date.now()}_${index}`,
+          lead_data: {
+            industry: lead.industry || null,
+            companySize: lead.companySize || null,
+            experience: lead.experience || lead.yearsOfExperience || null,
+            connections: lead.connections || lead.connectionCount || null,
+            verified: lead.verified || false,
+            seniority: lead.seniority || null,
+            department: lead.department || null,
+            skills: lead.skills || [],
+            lastActivity: lead.lastActivity || null,
+          },
+        };
+      }) || [];
+
+      console.log(`Lix API: Successfully transformed ${leads.length} leads`);
 
       return {
         success: true,
@@ -113,23 +156,36 @@ const lixService = {
           leads,
           total: data.total || leads.length,
           hasMore: data.hasMore || false,
+          searchTime: responseTime,
+          filtersApplied: {
+            jobTitles: filters.jobTitles?.length || 0,
+            industries: filters.industries?.length || 0,
+            locations: filters.locations?.length || 0,
+          }
         },
       };
     } catch (error) {
-      console.error('Error searching leads:', error);
+      console.error('Lix API: Error searching leads:', error);
 
       let errorMessage = 'Failed to connect to Lix API';
+      let errorCode = 'UNKNOWN_ERROR';
+      
       if (error.name === 'AbortError') {
         errorMessage = 'Request timeout - please check your internet connection';
+        errorCode = 'TIMEOUT_ERROR';
       } else if (error.message.includes('API key')) {
         errorMessage = error.message;
+        errorCode = 'AUTH_ERROR';
       } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
         errorMessage = 'Network error - please check your internet connection and try again';
+        errorCode = 'NETWORK_ERROR';
       }
 
       return {
         success: false,
         error: errorMessage,
+        errorCode: errorCode,
+        retryable: errorCode !== 'AUTH_ERROR',
       };
     }
   },
