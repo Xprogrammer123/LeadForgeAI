@@ -12,9 +12,11 @@ import SignupPage from "./pages/auth/SignupPage";
 import ForgotPasswordPage from "./pages/auth/ForgotPasswordPage";
 import DashboardPage from "./pages/dashboard/DashboardPage";
 import CampaignsPage from "./pages/dashboard/CampaignsPage";
+import CampaignPreviewPage from './pages/dashboard/CampaignPreviewPage';
 import ContactsPage from "./pages/dashboard/ContactsPage";
+import ContactPreviewPage from './pages/dashboard/ContactPreviewPage';
+import CreditsPage from "./pages/dashboard/CreditsPage";
 import SettingsPage from "./pages/dashboard/SettingsPage";
-import CreditsPage from "./pages/dashboard/CreditsPage"
 
 const Routes = () => {
   return (

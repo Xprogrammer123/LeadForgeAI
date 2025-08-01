@@ -430,6 +430,72 @@ const lixService = {
   },
 
   /**
+   * Start LinkedIn lead fetching for a campaign
+   */
+  startLeadFetching: async (lixCampaignId, targetingCriteria) => {
+    try {
+      const apiKey = validateApiKey();
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), API_TIMEOUT);
+
+      const response = await fetch(`${API_BASE_URL}/campaigns/${lixCampaignId}/start-fetching`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`,
+          'Accept': 'application/json',
+        },
+        body: JSON.stringify({
+          targeting_criteria: targetingCriteria,
+          max_leads: targetingCriteria.max_leads || 100,
+          fetch_immediately: true
+        }),
+        signal: controller.signal,
+      });
+
+      clearTimeout(timeoutId);
+
+      if (!response.ok) {
+        let errorMessage = 'Failed to start lead fetching';
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch (e) {
+          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        }
+        return { success: false, error: errorMessage };
+      }
+
+      const data = await response.json();
+      return {
+        success: true,
+        data: {
+          fetchingStarted: true,
+          estimatedLeads: data.estimated_leads || 0,
+          message: data.message || 'Lead fetching started successfully'
+        },
+      };
+    } catch (error) {
+      console.error('Error starting lead fetching:', error);
+
+      let errorMessage = 'Failed to start lead fetching';
+      if (error.name === 'AbortError') {
+        errorMessage = 'Request timeout - please try again';
+      } else if (error.message.includes('API key')) {
+        errorMessage = error.message;
+      } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+        errorMessage = 'Network error - please check your connection and try again';
+      }
+
+      return {
+        success: false,
+        error: errorMessage,
+      };
+    }
+  },
+
+  /**
    * Validate Lix API connection
    */
   validateConnection: async () => {

@@ -365,7 +365,12 @@ function ContactsPage() {
                       </td>
                       <td className="py-4 px-6">
                         <div className="flex space-x-2">
-                         
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => window.location.href = `/contacts/${lead.id}`}
+                            iconName="Eye"
+                          />
                           {lead.meetings?.length > 0 && (
                             <Button
                               size="sm"
@@ -377,7 +382,6 @@ function ContactsPage() {
                               Join Meeting
                             </Button>
                           )}
-                         
                         </div>
                       </td>
                     </tr>

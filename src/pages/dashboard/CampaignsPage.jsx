@@ -432,6 +432,12 @@ function CampaignsPage() {
                         <div className="flex space-x-2">
                           <Button
                             size="sm"
+                            variant="ghost"
+                            onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                            iconName="Eye"
+                          />
+                          <Button
+                            size="sm"
                             variant="outline"
                             onClick={() =>
                               handleUpdateCampaignStatus(

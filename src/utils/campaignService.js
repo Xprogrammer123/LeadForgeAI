@@ -184,7 +184,7 @@ const campaignService = {
 
       if (!lixResult.success) {
         console.error('Failed to fetch leads from Lix:', lixResult.error);
-        
+
         // Update campaign status to failed
         await supabase
           .from('campaigns')
@@ -193,7 +193,7 @@ const campaignService = {
             updated_at: new Date().toISOString()
           })
           .eq('id', campaignId);
-          
+
         return { 
           success: false, 
           error: `Lix API Error: ${lixResult.error}`,
@@ -214,14 +214,14 @@ const campaignService = {
 
       if (leadsToInsert.length > 0) {
         console.log(`Inserting ${leadsToInsert.length} leads into database...`);
-        
+
         const { error: insertError } = await supabase
           .from('linkedin_leads')
           .insert(leadsToInsert);
 
         if (insertError) {
           console.error('Failed to save leads:', insertError);
-          
+
           // Update campaign status to failed
           await supabase
             .from('campaigns')
@@ -230,7 +230,7 @@ const campaignService = {
               updated_at: new Date().toISOString()
             })
             .eq('id', campaignId);
-            
+
           return { success: false, error: 'Failed to save leads to database' };
         }
 
@@ -268,7 +268,7 @@ const campaignService = {
       };
     } catch (error) {
       console.error('Error generating leads for campaign:', error);
-      
+
       // Update campaign status to failed
       try {
         await supabase
@@ -281,7 +281,7 @@ const campaignService = {
       } catch (updateError) {
         console.error('Failed to update campaign status:', updateError);
       }
-      
+
       return { 
         success: false, 
         error: 'Failed to generate leads: ' + error.message,
@@ -471,103 +471,76 @@ const campaignService = {
     }
   },
 
-  // Delete a campaign
+  /**
+   * Delete a campaign
+   */
   deleteCampaign: async (campaignId) => {
     try {
-      const { error } = await supabase
+      const { data, error } = await supabase
         .from('campaigns')
         .delete()
-        .eq('id', campaignId);
+        .eq('id', campaignId)
+        .select();
 
       if (error) {
+        console.error('Error deleting campaign:', error);
         return { success: false, error: error.message };
       }
 
-      return { success: true };
+      return { success: true, data: data[0] };
     } catch (error) {
-      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
-        return {
-          success: false,
-          error:
-            'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.',
-        };
-      }
+      console.error('Error in deleteCampaign:', error);
       return { success: false, error: 'Failed to delete campaign' };
     }
   },
 
-  // Get campaign stats with real data
-  getCampaignStats: async () => {
+  /**
+   * Get a single campaign by ID
+   */
+  getCampaignById: async (campaignId) => {
     try {
-      // Get campaign stats
-      const { data: campaigns, error: campaignError } = await supabase
+      const { data, error } = await supabase
         .from('campaigns')
-        .select('leads_generated, meetings_booked, reply_rate');
+        .select('*')
+        .eq('id', campaignId)
+        .single();
 
-      if (campaignError) {
-        return { success: false, error: campaignError.message };
+      if (error) {
+        console.error('Error fetching campaign:', error);
+        return { success: false, error: error.message };
       }
 
-      // Get total leads from linkedin_leads table
-      const { count: totalLeads, error: leadsError } = await supabase
-        .from('linkedin_leads')
-        .select('*', { count: 'exact', head: true });
-
-      if (leadsError) {
-        console.error('Error getting leads count:', leadsError);
-      }
-
-      // Get total meetings from meetings table
-      const { count: totalMeetings, error: meetingsError } = await supabase
-        .from('meetings')
-        .select('*', { count: 'exact', head: true });
-
-      if (meetingsError) {
-        console.error('Error getting meetings count:', meetingsError);
-      }
-
-      // Calculate stats
-      const stats = {
-        totalLeads:
-          totalLeads || campaigns?.reduce((sum, campaign) => sum + (campaign.leads_generated || 0), 0) || 0,
-        totalMeetings:
-          totalMeetings || campaigns?.reduce((sum, campaign) => sum + (campaign.meetings_booked || 0), 0) || 0,
-        avgReplyRate:
-          campaigns?.length > 0
-            ? campaigns.reduce((sum, campaign) => sum + (campaign.reply_rate || 0), 0) / campaigns.length
-            : 0,
-      };
-
-      return { success: true, data: stats };
+      return { success: true, data };
     } catch (error) {
-      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
-        return {
-          success: false,
-          error:
-            'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.',
-        };
-      }
-      return { success: false, error: 'Failed to load campaign stats' };
+      console.error('Error in getCampaignById:', error);
+      return { success: false, error: 'Failed to fetch campaign' };
     }
   },
 
-  // Get leads for a specific campaign
+  /**
+   * Get leads for a specific campaign
+   */
   getCampaignLeads: async (campaignId) => {
     try {
       const { data, error } = await supabase
         .from('linkedin_leads')
-        .select('*')
+        .select(`
+          *,
+          campaigns(name, id),
+          meetings(id, scheduled_at, meeting_status)
+        `)
         .eq('campaign_id', campaignId)
         .order('created_at', { ascending: false });
 
       if (error) {
+        console.error('Error fetching campaign leads:', error);
         return { success: false, error: error.message };
       }
 
       return { success: true, data: data || [] };
     } catch (error) {
-      console.error('Error getting campaign leads:', error);
-      return { success: false, error: 'Failed to get campaign leads' };
+      console.error('Error in getCampaignLeads:', error);
+      return { success: false, error: 'Failed to fetch campaign leads' };
     }
   },
 };
