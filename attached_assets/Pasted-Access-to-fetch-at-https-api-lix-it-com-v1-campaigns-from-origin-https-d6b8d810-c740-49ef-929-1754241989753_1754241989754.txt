@@ -1,0 +1,144 @@
+Access to fetch at 'https://api.lix-it.com/v1/campaigns' from origin 'https://d6b8d810-c740-49ef-9293-2c915a9a7128-00-zuzgpy2mo3.riker.replit.dev' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: No 'Access-Control-Allow-Origin' header is present on the requested resource.
+lixService.js:30  POST https://api.lix-it.com/v1/campaigns net::ERR_FAILED
+fetchWithRetry @ lixService.js:30
+await in fetchWithRetry
+createLixCampaign @ lixService.js:347
+handleCreateCampaign @ CampaignsPage.jsx:119
+await in handleCreateCampaign
+callCallback2 @ react-dom.development.js:4164
+invokeGuardedCallbackDev @ react-dom.development.js:4213
+invokeGuardedCallback @ react-dom.development.js:4277
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+executeDispatch @ react-dom.development.js:9041
+processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+processDispatchQueue @ react-dom.development.js:9086
+dispatchEventsForPlugins @ react-dom.development.js:9097
+(anonymous) @ react-dom.development.js:9288
+batchedUpdates$1 @ react-dom.development.js:26179
+batchedUpdates @ react-dom.development.js:3991
+dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+dispatchEvent @ react-dom.development.js:6457
+dispatchDiscreteEvent @ react-dom.development.js:6430
+rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1 Fetch attempt 3 failed: TypeError: Failed to fetch
+    at fetchWithRetry (lixService.js:30:30)
+    at async Object.createLixCampaign (lixService.js:347:24)
+    at async handleCreateCampaign (CampaignsPage.jsx:119:25)
+(anonymous) @ rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1
+setTimeout
+console.error @ rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1
+fetchWithRetry @ lixService.js:40
+await in fetchWithRetry
+createLixCampaign @ lixService.js:347
+handleCreateCampaign @ CampaignsPage.jsx:119
+await in handleCreateCampaign
+callCallback2 @ react-dom.development.js:4164
+invokeGuardedCallbackDev @ react-dom.development.js:4213
+invokeGuardedCallback @ react-dom.development.js:4277
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+executeDispatch @ react-dom.development.js:9041
+processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+processDispatchQueue @ react-dom.development.js:9086
+dispatchEventsForPlugins @ react-dom.development.js:9097
+(anonymous) @ react-dom.development.js:9288
+batchedUpdates$1 @ react-dom.development.js:26179
+batchedUpdates @ react-dom.development.js:3991
+dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+dispatchEvent @ react-dom.development.js:6457
+dispatchDiscreteEvent @ react-dom.development.js:6430
+rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1 Network error - unable to reach the API
+(anonymous) @ rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1
+setTimeout
+console.error @ rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1
+fetchWithRetry @ lixService.js:49
+await in fetchWithRetry
+createLixCampaign @ lixService.js:347
+handleCreateCampaign @ CampaignsPage.jsx:119
+await in handleCreateCampaign
+callCallback2 @ react-dom.development.js:4164
+invokeGuardedCallbackDev @ react-dom.development.js:4213
+invokeGuardedCallback @ react-dom.development.js:4277
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+executeDispatch @ react-dom.development.js:9041
+processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+processDispatchQueue @ react-dom.development.js:9086
+dispatchEventsForPlugins @ react-dom.development.js:9097
+(anonymous) @ react-dom.development.js:9288
+batchedUpdates$1 @ react-dom.development.js:26179
+batchedUpdates @ react-dom.development.js:3991
+dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+dispatchEvent @ react-dom.development.js:6457
+dispatchDiscreteEvent @ react-dom.development.js:6430
+rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1 Error creating Lix campaign: Error: Network error - unable to reach Lix API. Please check the VITE_LIX_API_URL environment variable.
+    at fetchWithRetry (lixService.js:51:17)
+    at async Object.createLixCampaign (lixService.js:347:24)
+    at async handleCreateCampaign (CampaignsPage.jsx:119:25)
+(anonymous) @ rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1
+setTimeout
+console.error @ rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1
+createLixCampaign @ lixService.js:386
+await in createLixCampaign
+handleCreateCampaign @ CampaignsPage.jsx:119
+await in handleCreateCampaign
+callCallback2 @ react-dom.development.js:4164
+invokeGuardedCallbackDev @ react-dom.development.js:4213
+invokeGuardedCallback @ react-dom.development.js:4277
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+executeDispatch @ react-dom.development.js:9041
+processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+processDispatchQueue @ react-dom.development.js:9086
+dispatchEventsForPlugins @ react-dom.development.js:9097
+(anonymous) @ react-dom.development.js:9288
+batchedUpdates$1 @ react-dom.development.js:26179
+batchedUpdates @ react-dom.development.js:3991
+dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+dispatchEvent @ react-dom.development.js:6457
+dispatchDiscreteEvent @ react-dom.development.js:6430
+rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1 Lix API troubleshooting: Please check your VITE_LIX_API_URL environment variable and internet connection.
+(anonymous) @ rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1
+setTimeout
+console.error @ rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1
+createLixCampaign @ lixService.js:404
+await in createLixCampaign
+handleCreateCampaign @ CampaignsPage.jsx:119
+await in handleCreateCampaign
+callCallback2 @ react-dom.development.js:4164
+invokeGuardedCallbackDev @ react-dom.development.js:4213
+invokeGuardedCallback @ react-dom.development.js:4277
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+executeDispatch @ react-dom.development.js:9041
+processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+processDispatchQueue @ react-dom.development.js:9086
+dispatchEventsForPlugins @ react-dom.development.js:9097
+(anonymous) @ react-dom.development.js:9288
+batchedUpdates$1 @ react-dom.development.js:26179
+batchedUpdates @ react-dom.development.js:3991
+dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+dispatchEvent @ react-dom.development.js:6457
+dispatchDiscreteEvent @ react-dom.development.js:6430
+rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1 Error in handleCreateCampaign: Error: Cannot connect to Lix API
+    at handleCreateCampaign (CampaignsPage.jsx:122:15)
+(anonymous) @ rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1
+setTimeout
+console.error @ rocket-web.js?_cfg=https%3A%2F%2Fagenticai2158back.builtwithrocket.new&_be=https%3A%2F%2Fapplication.rocket.new&_v=0.1.6:1
+handleCreateCampaign @ CampaignsPage.jsx:153
+await in handleCreateCampaign
+callCallback2 @ react-dom.development.js:4164
+invokeGuardedCallbackDev @ react-dom.development.js:4213
+invokeGuardedCallback @ react-dom.development.js:4277
+invokeGuardedCallbackAndCatchFirstError @ react-dom.development.js:4291
+executeDispatch @ react-dom.development.js:9041
+processDispatchQueueItemsInOrder @ react-dom.development.js:9073
+processDispatchQueue @ react-dom.development.js:9086
+dispatchEventsForPlugins @ react-dom.development.js:9097
+(anonymous) @ react-dom.development.js:9288
+batchedUpdates$1 @ react-dom.development.js:26179
+batchedUpdates @ react-dom.development.js:3991
+dispatchEventForPluginEventSystem @ react-dom.development.js:9287
+dispatchEventWithEnableCapturePhaseSelectiveHydrationWithoutDiscreteEventReplay @ react-dom.development.js:6465
+dispatchEvent @ react-dom.development.js:6457
+dispatchDiscreteEvent @ react-dom.development.js:6430

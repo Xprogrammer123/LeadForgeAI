@@ -1,8 +1,4 @@
-/**
- * Lix API service for LinkedIn lead generation
- * Handles lead fetching, campaign management, and messaging
- * Updated to use direct HTTPS Lix API calls
- */
+
 
 const getBaseUrl = () => {
   // Use environment variable for Lix API URL, default to real Lix API
