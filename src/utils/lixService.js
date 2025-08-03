@@ -95,10 +95,10 @@ const lixService = {
         verified_only: 'false', // Include both verified and unverified leads
       });
 
-      console.log('Lix API: Making request to /v1/person with params:', queryParams.toString());
+      console.log('Lix API: Making request to /v1/li/linkedin/search/people with params:', queryParams.toString());
 
       const startTime = Date.now();
-      const response = await fetchWithRetry(`/v1/person?${queryParams}`, {
+      const response = await fetchWithRetry(`/v1/li/linkedin/search/people?${queryParams}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
