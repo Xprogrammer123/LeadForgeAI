@@ -6,7 +6,7 @@
 
 const getBaseUrl = () => {
   // Use environment variable for Lix API URL, default to real Lix API
-  return import.meta.env.VITE_LIX_API_URL || 'https://api.lix.com';
+  return import.meta.env.VITE_LIX_API_URL || 'https://api.lix-it.com';
 };
 
 const fetchWithRetry = async (url, options = {}, retries = 3) => {
@@ -95,10 +95,10 @@ const lixService = {
         verified_only: 'false', // Include both verified and unverified leads
       });
 
-      console.log('Lix API: Making request to /leads/search with params:', queryParams.toString());
+      console.log('Lix API: Making request to /v1/person with params:', queryParams.toString());
 
       const startTime = Date.now();
-      const response = await fetchWithRetry(`/leads/search?${queryParams}`, {
+      const response = await fetchWithRetry(`/v1/person?${queryParams}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -222,7 +222,7 @@ const lixService = {
     try {
       const apiKey = validateApiKey();
 
-      const response = await fetchWithRetry('/messages/send', {
+      const response = await fetchWithRetry('/v1/messages/send', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -282,7 +282,7 @@ const lixService = {
     try {
       const apiKey = validateApiKey();
 
-      const response = await fetchWithRetry(`/messages/inbox?campaign_id=${campaignId}`, {
+      const response = await fetchWithRetry(`/v1/messages/inbox?campaign_id=${campaignId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -344,7 +344,7 @@ const lixService = {
     try {
       const apiKey = validateApiKey();
 
-      const response = await fetchWithRetry('/campaigns', {
+      const response = await fetchWithRetry('/v1/campaigns', {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -415,7 +415,7 @@ const lixService = {
     try {
       const apiKey = validateApiKey();
 
-      const response = await fetchWithRetry(`/campaigns/${lixCampaignId}/metrics`, {
+      const response = await fetchWithRetry(`/v1/campaigns/${lixCampaignId}/metrics`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -471,7 +471,7 @@ const lixService = {
     try {
       const apiKey = validateApiKey();
 
-      const response = await fetchWithRetry(`/campaigns/${lixCampaignId}/start-fetching`, {
+      const response = await fetchWithRetry(`/v1/campaigns/${lixCampaignId}/start-fetching`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -531,7 +531,7 @@ const lixService = {
     try {
       const apiKey = validateApiKey();
 
-      const response = await fetchWithRetry('/auth/validate', {
+      const response = await fetchWithRetry('/v1/auth/validate', {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
