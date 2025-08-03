@@ -1,8 +1,15 @@
 
 
 const getBaseUrl = () => {
-  // Use environment variable for Lix API URL, default to real Lix API
-  return import.meta.env.VITE_LIX_API_URL || 'https://api.lix-it.com';
+  // Use environment variable for Lix API URL, default to real Lix API with CORS proxy
+  const baseUrl = import.meta.env.VITE_LIX_API_URL || 'https://api.lix-it.com';
+  
+  // Use CORS proxy for development to bypass CORS restrictions
+  if (baseUrl.includes('api.lix-it.com')) {
+    return `https://cors-anywhere.herokuapp.com/${baseUrl}`;
+  }
+  
+  return baseUrl;
 };
 
 const fetchWithRetry = async (url, options = {}, retries = 3) => {
