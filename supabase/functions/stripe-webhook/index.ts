@@ -71,7 +71,8 @@ serve(async (req) => {
         // Handle payment intent success
         if (event.type === 'payment_intent.succeeded') {
             const paymentIntent = event.data.object;
-            const metadata = paymentIntent.metadata;
+            const metadata = paymentIntent.metadata
+                ;
 
             console.log(`Payment succeeded: ${paymentIntent.id}`, metadata);
 
