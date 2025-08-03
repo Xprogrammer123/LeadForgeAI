@@ -6,7 +6,7 @@
 
 const getBaseUrl = () => {
   // Use environment variable for Lix API URL, default to a placeholder
-  return process.env.VITE_LIX_API_URL || 'https://api.lix-service.com'; // Replace with actual Lix API URL
+  return import.meta.env.VITE_LIX_API_URL || 'https://api.lix-service.com'; // Replace with actual Lix API URL
 };
 
 const fetchWithRetry = async (url, options = {}, retries = 3) => {
