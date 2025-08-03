@@ -1,3 +1,4 @@
+
 import { supabase } from './supabase';
 
 const callLixProxy = async (endpoint, method = 'GET', body = null, queryParams = null) => {
@@ -13,32 +14,46 @@ const callLixProxy = async (endpoint, method = 'GET', body = null, queryParams =
     console.log('Endpoint:', endpoint);
     console.log('Method:', method);
 
-    const { data, error } = await supabase.functions.invoke('lix-api-proxy', {
-      body: {
+    // Use the absolute URL to the Edge Function like stripeService does
+    const response = await fetch('https://kgrbevxmtuhuenfqixsu.supabase.co/functions/v1/lix-api-proxy', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
         endpoint,
         method,
         body,
         queryParams
-      },
-      headers: {
-        'Authorization': `Bearer ${session.access_token}`,
-      }
+      })
     });
 
-    if (error) {
-      console.error('Supabase function error:', error);
-      throw new Error(error.message || 'Failed to call Lix API proxy');
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error('Edge function error:', errorText);
+      throw new Error('Failed to call Lix API proxy. Please check your internet connection and try again.');
     }
 
-    console.log('Lix Service: Response received', { success: data?.success, status: data?.status });
+    const data = await response.json();
 
     if (!data.success) {
       throw new Error(data.error || `HTTP ${data.status}: Request failed`);
     }
 
+    console.log('Lix Service: Response received', { success: data?.success, status: data?.status });
+
     return data.data;
   } catch (error) {
     console.error('Lix Service Error:', error);
+    
+    // Handle specific error types like stripeService does
+    if (error.message?.includes('Failed to fetch') || 
+        error.message?.includes('NetworkError') ||
+        error.name === 'TypeError' && error.message?.includes('fetch')) {
+      throw new Error('Cannot connect to Lix API service. Please check your internet connection and try again.');
+    }
+    
     throw error;
   }
 };
