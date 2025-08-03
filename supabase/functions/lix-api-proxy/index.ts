@@ -15,13 +15,25 @@ serve(async (req) => {
   }
 
   try {
-    // Validate environment variables
-    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    // Validate environment variables with correct names
+    const supabaseUrl = Deno.env.get('VITE_SUPABASE_URL') || Deno.env.get('SUPABASE_URL');
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
-    const lixApiKey = Deno.env.get('LIX_API_KEY');
+    const lixApiKey = Deno.env.get('LIX_API_KEY') || Deno.env.get('VITE_LIX_API_KEY');
     const lixApiUrl = Deno.env.get('LIX_API_URL') || 'https://api.lix-it.com';
 
+    console.log('Environment check:', {
+      supabaseUrl: !!supabaseUrl,
+      supabaseServiceKey: !!supabaseServiceKey,
+      lixApiKey: !!lixApiKey,
+      lixApiUrl
+    });
+
     if (!supabaseUrl || !supabaseServiceKey || !lixApiKey) {
+      console.error('Missing environment variables:', {
+        supabaseUrl: !supabaseUrl,
+        supabaseServiceKey: !supabaseServiceKey,
+        lixApiKey: !lixApiKey
+      });
       throw new Error('Missing required environment variables');
     }
 
@@ -45,6 +57,7 @@ serve(async (req) => {
     );
 
     if (authError || !user) {
+      console.error('Auth error:', authError);
       throw new Error('Invalid authentication token');
     }
 
@@ -63,7 +76,11 @@ serve(async (req) => {
       fullUrl += `?${params.toString()}`;
     }
 
-    console.log('Lix API Proxy: Making request to:', fullUrl);
+    console.log('Making request to Lix API:', {
+      url: fullUrl,
+      method,
+      hasBody: !!body
+    });
 
     // Prepare headers for Lix API
     const headers = {
@@ -93,6 +110,7 @@ serve(async (req) => {
       clearTimeout(timeoutId);
     } catch (error) {
       clearTimeout(timeoutId);
+      console.error('Fetch error:', error);
       if (error.name === 'AbortError') {
         throw new Error('Request timeout');
       }
@@ -109,7 +127,21 @@ serve(async (req) => {
       responseData = await response.text();
     }
 
-    console.log('Lix API Proxy: Response status:', response.status);
+    console.log('Lix API Response:', {
+      status: response.status,
+      ok: response.ok,
+      contentType,
+      dataLength: typeof responseData === 'string' ? responseData.length : Object.keys(responseData || {}).length
+    });
+
+    // If the response is not ok, log the error details
+    if (!response.ok) {
+      console.error('Lix API Error Response:', {
+        status: response.status,
+        statusText: response.statusText,
+        data: responseData
+      });
+    }
 
     // Return the response
     return new Response(
@@ -118,6 +150,7 @@ serve(async (req) => {
         status: response.status,
         data: responseData,
         headers: Object.fromEntries(response.headers.entries()),
+        error: !response.ok ? `HTTP ${response.status}: ${response.statusText}` : null
       }),
       {
         status: 200,
