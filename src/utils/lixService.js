@@ -1,78 +1,46 @@
+import { supabase } from './supabase';
 
+const callLixProxy = async (endpoint, method = 'GET', body = null, queryParams = null) => {
+  try {
+    // Get the current session to include auth token
+    const { data: { session } } = await supabase.auth.getSession();
 
-const getBaseUrl = () => {
-  // Use environment variable for Lix API URL, default to real Lix API with CORS proxy
-  const baseUrl = import.meta.env.VITE_LIX_API_URL || 'https://api.lix-it.com';
-  
-  // Use CORS proxy for development to bypass CORS restrictions
-  if (baseUrl.includes('api.lix-it.com')) {
-    return `https://cors-anywhere.herokuapp.com/${baseUrl}`;
-  }
-  
-  return baseUrl;
-};
-
-const fetchWithRetry = async (url, options = {}, retries = 3) => {
-  const baseUrl = getBaseUrl();
-  const fullUrl = `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`;
-
-  console.log('Lix API: Making real API call to:', fullUrl);
-
-  for (let i = 0; i < retries; i++) {
-    let controller;
-    let timeoutId;
-    
-    try {
-      // Add timeout to prevent hanging requests
-      controller = new AbortController();
-      timeoutId = setTimeout(() => {
-        console.log(`Request timeout after 30 seconds, attempt ${i + 1}`);
-        controller.abort();
-      }, 30000); // 30 second timeout
-
-      const response = await fetch(fullUrl, {
-        ...options,
-        signal: controller.signal,
-      });
-
-      clearTimeout(timeoutId);
-      return response;
-    } catch (error) {
-      if (timeoutId) clearTimeout(timeoutId);
-      
-      console.error(`Fetch attempt ${i + 1} failed:`, error);
-
-      // Handle different error types
-      if (error.name === 'AbortError') {
-        console.error('Request was aborted (timeout or manual cancel)');
-        if (i === retries - 1) {
-          throw new Error('Request timeout - please check your internet connection and the API endpoint');
-        }
-      } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-        console.error('Network error - unable to reach the API');
-        if (i === retries - 1) {
-          throw new Error('Network error - unable to reach Lix API. Please check the VITE_LIX_API_URL environment variable.');
-        }
-      } else {
-        // For other errors, throw immediately
-        throw error;
-      }
-
-      // Wait before retrying (exponential backoff)
-      console.log(`Waiting ${Math.pow(2, i)} seconds before retry...`);
-      await new Promise((resolve) => setTimeout(resolve, Math.pow(2, i) * 1000));
+    if (!session) {
+      throw new Error('No active session. Please log in.');
     }
-  }
-};
 
-// Check if API key is configured
-const validateApiKey = () => {
-  const apiKey = import.meta.env.VITE_LIX_API_KEY;
-  if (!apiKey || apiKey.trim() === '') {
-    throw new Error('Lix API key is not configured. Please set VITE_LIX_API_KEY in your environment variables.');
+    console.log('Lix Service: Making request via Supabase Edge Function');
+    console.log('Endpoint:', endpoint);
+    console.log('Method:', method);
+
+    const { data, error } = await supabase.functions.invoke('lix-api-proxy', {
+      body: {
+        endpoint,
+        method,
+        body,
+        queryParams
+      },
+      headers: {
+        'Authorization': `Bearer ${session.access_token}`,
+      }
+    });
+
+    if (error) {
+      console.error('Supabase function error:', error);
+      throw new Error(error.message || 'Failed to call Lix API proxy');
+    }
+
+    console.log('Lix Service: Response received', { success: data?.success, status: data?.status });
+
+    if (!data.success) {
+      throw new Error(data.error || `HTTP ${data.status}: Request failed`);
+    }
+
+    return data.data;
+  } catch (error) {
+    console.error('Lix Service Error:', error);
+    throw error;
   }
-  console.log('Lix API: Using API key:', apiKey.substring(0, 10) + '...');
-  return apiKey;
 };
 
 const lixService = {
@@ -82,69 +50,34 @@ const lixService = {
   searchLeads: async (filters) => {
     try {
       console.log('Lix API: Starting lead search with filters:', filters);
-      
-      const apiKey = validateApiKey();
 
       // Build query parameters with enhanced filtering
-      const queryParams = new URLSearchParams({
+      const queryParams = {
         job_titles: filters.jobTitles?.join(',') || '',
         industries: filters.industries?.join(',') || '',
         locations: filters.locations?.join(',') || '',
         company_sizes: filters.companySizes?.join(',') || '',
         experience_levels: filters.experienceLevels?.join(',') || '',
         limit: filters.limit || 50,
-        include_email: 'true', // Request email data if available
-        include_phone: 'true', // Request phone data if available
-        verified_only: 'false', // Include both verified and unverified leads
-      });
+        include_email: 'true',
+        include_phone: 'true',
+        verified_only: 'false',
+      };
 
-      console.log('Lix API: Making request to /v1/li/linkedin/search/people with params:', queryParams.toString());
+      console.log('Lix API: Making request to /v1/li/linkedin/search/people');
 
       const startTime = Date.now();
-      const response = await fetchWithRetry(`/v1/li/linkedin/search/people?${queryParams}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-          'X-Request-Source': 'leadforge-campaign-creation',
-          'User-Agent': 'LeadForge/1.0',
-        },
-      });
-
+      const data = await callLixProxy('/v1/li/linkedin/search/people', 'GET', null, queryParams);
       const responseTime = Date.now() - startTime;
-      console.log(`Lix API: Response received in ${responseTime}ms, status: ${response.status}`);
 
-      if (!response.ok) {
-        let errorMessage = 'Failed to search leads';
-        let errorDetails = null;
-        
-        try {
-          const error = await response.json();
-          errorMessage = error.message || errorMessage;
-          errorDetails = error.details || null;
-          console.error('Lix API Error Response:', error);
-        } catch (e) {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-          console.error('Lix API: Failed to parse error response:', e);
-        }
-        
-        return { 
-          success: false, 
-          error: errorMessage,
-          details: errorDetails,
-          statusCode: response.status
-        };
-      }
-
-      const data = await response.json();
+      console.log(`Lix API: Response received in ${responseTime}ms`);
       console.log('Lix API: Raw response data:', {
         leadsCount: data.leads?.length || 0,
         total: data.total,
         hasMore: data.hasMore
       });
 
-      // Transform Lix API response to our format with enhanced data mapping
+      // Transform Lix API response to our format
       const leads = data.leads?.map((lead, index) => {
         console.log(`Lix API: Processing lead ${index + 1}:`, {
           name: lead.name,
@@ -197,14 +130,14 @@ const lixService = {
 
       let errorMessage = 'Failed to connect to Lix API';
       let errorCode = 'UNKNOWN_ERROR';
-      
-      if (error.name === 'AbortError') {
+
+      if (error.message.includes('No active session')) {
+        errorMessage = 'Please log in to continue';
+        errorCode = 'AUTH_ERROR';
+      } else if (error.message.includes('timeout')) {
         errorMessage = 'Request timeout - please check your internet connection';
         errorCode = 'TIMEOUT_ERROR';
-      } else if (error.message.includes('API key')) {
-        errorMessage = error.message;
-        errorCode = 'AUTH_ERROR';
-      } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+      } else if (error.message.includes('network') || error.message.includes('fetch')) {
         errorMessage = 'Network error - please check your internet connection and try again';
         errorCode = 'NETWORK_ERROR';
       }
@@ -223,34 +156,13 @@ const lixService = {
    */
   sendLinkedInMessage: async (leadId, message, campaignId) => {
     try {
-      const apiKey = validateApiKey();
-
-      const response = await fetchWithRetry('/v1/messages/send', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          recipient_id: leadId,
-          message: message,
-          campaign_id: campaignId,
-          message_type: 'direct_message',
-        }),
+      const data = await callLixProxy('/v1/messages/send', 'POST', {
+        recipient_id: leadId,
+        message: message,
+        campaign_id: campaignId,
+        message_type: 'direct_message',
       });
 
-      if (!response.ok) {
-        let errorMessage = 'Failed to send message';
-        try {
-          const error = await response.json();
-          errorMessage = error.message || errorMessage;
-        } catch (e) {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        return { success: false, error: errorMessage };
-      }
-
-      const data = await response.json();
       return {
         success: true,
         data: {
@@ -263,11 +175,11 @@ const lixService = {
       console.error('Error sending LinkedIn message:', error);
 
       let errorMessage = 'Failed to send LinkedIn message';
-      if (error.name === 'AbortError') {
+      if (error.message.includes('No active session')) {
+        errorMessage = 'Please log in to continue';
+      } else if (error.message.includes('timeout')) {
         errorMessage = 'Request timeout - please try again';
-      } else if (error.message.includes('API key')) {
-        errorMessage = error.message;
-      } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+      } else if (error.message.includes('network')) {
         errorMessage = 'Network error - please check your connection and try again';
       }
 
@@ -283,28 +195,7 @@ const lixService = {
    */
   getInboxMessages: async (campaignId) => {
     try {
-      const apiKey = validateApiKey();
-
-      const response = await fetchWithRetry(`/v1/messages/inbox?campaign_id=${campaignId}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to get inbox messages';
-        try {
-          const error = await response.json();
-          errorMessage = error.message || errorMessage;
-        } catch (e) {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        return { success: false, error: errorMessage };
-      }
-
-      const data = await response.json();
+      const data = await callLixProxy(`/v1/messages/inbox`, 'GET', null, { campaign_id: campaignId });
 
       const messages = data.messages?.map((msg) => ({
         id: msg.id,
@@ -325,11 +216,11 @@ const lixService = {
       console.error('Error getting inbox messages:', error);
 
       let errorMessage = 'Failed to get inbox messages';
-      if (error.name === 'AbortError') {
+      if (error.message.includes('No active session')) {
+        errorMessage = 'Please log in to continue';
+      } else if (error.message.includes('timeout')) {
         errorMessage = 'Request timeout - please try again';
-      } else if (error.message.includes('API key')) {
-        errorMessage = error.message;
-      } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+      } else if (error.message.includes('network')) {
         errorMessage = 'Network error - please check your connection and try again';
       }
 
@@ -345,39 +236,18 @@ const lixService = {
    */
   createLixCampaign: async (campaignData) => {
     try {
-      const apiKey = validateApiKey();
-
-      const response = await fetchWithRetry('/v1/campaigns', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
+      const data = await callLixProxy('/v1/campaigns', 'POST', {
+        name: campaignData.name,
+        description: campaignData.message,
+        target_filters: {
+          job_titles: campaignData.target_job_titles,
+          industries: campaignData.target_industries,
+          locations: campaignData.target_locations,
         },
-        body: JSON.stringify({
-          name: campaignData.name,
-          description: campaignData.message,
-          target_filters: {
-            job_titles: campaignData.target_job_titles,
-            industries: campaignData.target_industries,
-            locations: campaignData.target_locations,
-          },
-          message_template: campaignData.message_template,
-          daily_limit: 50, // LinkedIn daily message limit
-        }),
+        message_template: campaignData.message_template,
+        daily_limit: 50,
       });
 
-      if (!response.ok) {
-        let errorMessage = 'Failed to create Lix campaign';
-        try {
-          const error = await response.json();
-          errorMessage = error.message || errorMessage;
-        } catch (e) {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        return { success: false, error: errorMessage };
-      }
-
-      const data = await response.json();
       return {
         success: true,
         data: {
@@ -390,18 +260,15 @@ const lixService = {
 
       let errorMessage = 'Failed to create Lix campaign';
       let troubleshooting = '';
-      
-      if (error.message.includes('Request timeout')) {
+
+      if (error.message.includes('No active session')) {
+        errorMessage = 'Please log in to continue';
+      } else if (error.message.includes('timeout')) {
         errorMessage = 'Request timeout - Lix API is not responding';
-        troubleshooting = 'Please verify your VITE_LIX_API_URL is correct and the API is accessible.';
-      } else if (error.message.includes('Network error')) {
-        errorMessage = 'Cannot connect to Lix API';
-        troubleshooting = 'Please check your VITE_LIX_API_URL environment variable and internet connection.';
-      } else if (error.message.includes('API key')) {
-        errorMessage = error.message;
-      } else if (error.name === 'AbortError') {
-        errorMessage = 'Request was cancelled or timed out';
         troubleshooting = 'The API request took too long to respond.';
+      } else if (error.message.includes('network')) {
+        errorMessage = 'Cannot connect to Lix API';
+        troubleshooting = 'Please check your internet connection.';
       }
 
       console.error('Lix API troubleshooting:', troubleshooting);
@@ -416,28 +283,8 @@ const lixService = {
 
   getCampaignMetrics: async (lixCampaignId) => {
     try {
-      const apiKey = validateApiKey();
+      const data = await callLixProxy(`/v1/campaigns/${lixCampaignId}/metrics`, 'GET');
 
-      const response = await fetchWithRetry(`/v1/campaigns/${lixCampaignId}/metrics`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        let errorMessage = 'Failed to get campaign metrics';
-        try {
-          const error = await response.json();
-          errorMessage = error.message || errorMessage;
-        } catch (e) {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        return { success: false, error: errorMessage };
-      }
-
-      const data = await response.json();
       return {
         success: true,
         data: {
@@ -452,11 +299,11 @@ const lixService = {
       console.error('Error getting campaign metrics:', error);
 
       let errorMessage = 'Failed to get campaign metrics';
-      if (error.name === 'AbortError') {
+      if (error.message.includes('No active session')) {
+        errorMessage = 'Please log in to continue';
+      } else if (error.message.includes('timeout')) {
         errorMessage = 'Request timeout - please try again';
-      } else if (error.message.includes('API key')) {
-        errorMessage = error.message;
-      } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+      } else if (error.message.includes('network')) {
         errorMessage = 'Network error - please check your connection and try again';
       }
 
@@ -472,34 +319,12 @@ const lixService = {
    */
   startLeadFetching: async (lixCampaignId, targetingCriteria) => {
     try {
-      const apiKey = validateApiKey();
-
-      const response = await fetchWithRetry(`/v1/campaigns/${lixCampaignId}/start-fetching`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`,
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify({
-          targeting_criteria: targetingCriteria,
-          max_leads: targetingCriteria.max_leads || 100,
-          fetch_immediately: true
-        }),
+      const data = await callLixProxy(`/v1/campaigns/${lixCampaignId}/start-fetching`, 'POST', {
+        targeting_criteria: targetingCriteria,
+        max_leads: targetingCriteria.max_leads || 100,
+        fetch_immediately: true
       });
 
-      if (!response.ok) {
-        let errorMessage = 'Failed to start lead fetching';
-        try {
-          const error = await response.json();
-          errorMessage = error.message || errorMessage;
-        } catch (e) {
-          errorMessage = `HTTP ${response.status}: ${response.statusText}`;
-        }
-        return { success: false, error: errorMessage };
-      }
-
-      const data = await response.json();
       return {
         success: true,
         data: {
@@ -512,11 +337,11 @@ const lixService = {
       console.error('Error starting lead fetching:', error);
 
       let errorMessage = 'Failed to start lead fetching';
-      if (error.name === 'AbortError') {
+      if (error.message.includes('No active session')) {
+        errorMessage = 'Please log in to continue';
+      } else if (error.message.includes('timeout')) {
         errorMessage = 'Request timeout - please try again';
-      } else if (error.message.includes('API key')) {
-        errorMessage = error.message;
-      } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+      } else if (error.message.includes('network')) {
         errorMessage = 'Network error - please check your connection and try again';
       }
 
@@ -532,21 +357,8 @@ const lixService = {
    */
   validateConnection: async () => {
     try {
-      const apiKey = validateApiKey();
+      const data = await callLixProxy('/v1/auth/validate', 'GET');
 
-      const response = await fetchWithRetry('/v1/auth/validate', {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      if (!response.ok) {
-        return { success: false, error: 'Invalid Lix API key' };
-      }
-
-      const data = await response.json();
       return {
         success: true,
         data: {
@@ -558,11 +370,11 @@ const lixService = {
       console.error('Error validating Lix connection:', error);
 
       let errorMessage = 'Failed to validate Lix API connection';
-      if (error.name === 'AbortError') {
+      if (error.message.includes('No active session')) {
+        errorMessage = 'Please log in to continue';
+      } else if (error.message.includes('timeout')) {
         errorMessage = 'Connection timeout - please check your internet connection';
-      } else if (error.message.includes('API key')) {
-        errorMessage = error.message;
-      } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+      } else if (error.message.includes('network')) {
         errorMessage = 'Network error - unable to connect to Lix API';
       }
 
