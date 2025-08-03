@@ -16,10 +16,16 @@ const fetchWithRetry = async (url, options = {}, retries = 3) => {
   console.log('Lix API: Making real API call to:', fullUrl);
 
   for (let i = 0; i < retries; i++) {
+    let controller;
+    let timeoutId;
+    
     try {
       // Add timeout to prevent hanging requests
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
+      controller = new AbortController();
+      timeoutId = setTimeout(() => {
+        console.log(`Request timeout after 30 seconds, attempt ${i + 1}`);
+        controller.abort();
+      }, 30000); // 30 second timeout
 
       const response = await fetch(fullUrl, {
         ...options,
@@ -29,14 +35,28 @@ const fetchWithRetry = async (url, options = {}, retries = 3) => {
       clearTimeout(timeoutId);
       return response;
     } catch (error) {
+      if (timeoutId) clearTimeout(timeoutId);
+      
       console.error(`Fetch attempt ${i + 1} failed:`, error);
 
-      // If it's the last retry or not a network error, throw the error
-      if (i === retries - 1 || error.name !== 'TypeError') {
+      // Handle different error types
+      if (error.name === 'AbortError') {
+        console.error('Request was aborted (timeout or manual cancel)');
+        if (i === retries - 1) {
+          throw new Error('Request timeout - please check your internet connection and the API endpoint');
+        }
+      } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
+        console.error('Network error - unable to reach the API');
+        if (i === retries - 1) {
+          throw new Error('Network error - unable to reach Lix API. Please check the VITE_LIX_API_URL environment variable.');
+        }
+      } else {
+        // For other errors, throw immediately
         throw error;
       }
 
       // Wait before retrying (exponential backoff)
+      console.log(`Waiting ${Math.pow(2, i)} seconds before retry...`);
       await new Promise((resolve) => setTimeout(resolve, Math.pow(2, i) * 1000));
     }
   }
@@ -366,17 +386,27 @@ const lixService = {
       console.error('Error creating Lix campaign:', error);
 
       let errorMessage = 'Failed to create Lix campaign';
-      if (error.name === 'AbortError') {
-        errorMessage = 'Request timeout - please try again';
+      let troubleshooting = '';
+      
+      if (error.message.includes('Request timeout')) {
+        errorMessage = 'Request timeout - Lix API is not responding';
+        troubleshooting = 'Please verify your VITE_LIX_API_URL is correct and the API is accessible.';
+      } else if (error.message.includes('Network error')) {
+        errorMessage = 'Cannot connect to Lix API';
+        troubleshooting = 'Please check your VITE_LIX_API_URL environment variable and internet connection.';
       } else if (error.message.includes('API key')) {
         errorMessage = error.message;
-      } else if (error.name === 'TypeError' && error.message === 'Failed to fetch') {
-        errorMessage = 'Network error - please check your internet connection and try again';
+      } else if (error.name === 'AbortError') {
+        errorMessage = 'Request was cancelled or timed out';
+        troubleshooting = 'The API request took too long to respond.';
       }
+
+      console.error('Lix API troubleshooting:', troubleshooting);
 
       return {
         success: false,
         error: errorMessage,
+        troubleshooting: troubleshooting,
       };
     }
   },
