@@ -41,9 +41,19 @@ const Routes = () => {
                 <CampaignsPage />
               </ProtectedRoute>
             } />
+            <Route path="/campaigns/:campaignId" element={
+              <ProtectedRoute>
+                <CampaignPreviewPage />
+              </ProtectedRoute>
+            } />
             <Route path="/contacts" element={
               <ProtectedRoute>
                 <ContactsPage />
+              </ProtectedRoute>
+            } />
+              <Route path="/contacts/:contactId" element={
+              <ProtectedRoute>
+                <ContactPreviewPage />
               </ProtectedRoute>
             } />
             <Route path="/credits" element={

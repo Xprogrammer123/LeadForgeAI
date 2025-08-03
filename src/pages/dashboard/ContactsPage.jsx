@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import DashboardLayout from '../../components/dashboard/DashboardLayout';
@@ -19,6 +20,7 @@ function ContactsPage() {
   const [showScheduleModal, setShowScheduleModal] = useState(false);
   const [availableSlots, setAvailableSlots] = useState([]);
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadLeads();
@@ -368,7 +370,7 @@ function ContactsPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => window.location.href = `/contacts/${lead.id}`}
+                            onClick={() => navigate(`/contacts/${lead.id}`)}
                             iconName="Eye"
                           />
                           {lead.meetings?.length > 0 && (

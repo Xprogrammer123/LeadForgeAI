@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { motion } from 'framer-motion';
 import DashboardLayout from '../../components/dashboard/DashboardLayout';
@@ -29,6 +30,7 @@ function CampaignsPage() {
     status: 'draft',
   });
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   useEffect(() => {
     loadCampaigns();
@@ -433,7 +435,7 @@ function CampaignsPage() {
                           <Button
                             size="sm"
                             variant="ghost"
-                            onClick={() => window.location.href = `/campaigns/${campaign.id}`}
+                            onClick={() => navigate(`/campaigns/${campaign.id}`)}
                             iconName="Eye"
                           />
                           <Button
