@@ -9,9 +9,113 @@ const getBaseUrl = () => {
   return import.meta.env.VITE_LIX_API_URL || 'https://api.lix-service.com'; // Replace with actual Lix API URL
 };
 
+// Mock API responses for development
+const mockApiResponse = async (url, options = {}) => {
+  console.log('Mock API call to:', url, 'with options:', options);
+  
+  // Simulate network delay
+  await new Promise(resolve => setTimeout(resolve, 500 + Math.random() * 1000));
+  
+  if (url.includes('/campaigns') && options.method === 'POST') {
+    return {
+      ok: true,
+      json: () => Promise.resolve({
+        campaign_id: `mock_campaign_${Date.now()}`,
+        status: 'active',
+        message: 'Campaign created successfully'
+      })
+    };
+  }
+  
+  if (url.includes('/leads/search')) {
+    const mockLeads = Array.from({ length: 10 }, (_, i) => ({
+      id: `mock_lead_${Date.now()}_${i}`,
+      name: `Lead ${i + 1}`,
+      firstName: `First${i + 1}`,
+      lastName: `Last${i + 1}`,
+      jobTitle: ['Software Engineer', 'Product Manager', 'Marketing Director', 'Sales Manager'][i % 4],
+      companyName: ['Tech Corp', 'Innovation Inc', 'Growth Co', 'Success Ltd'][i % 4],
+      location: ['San Francisco, CA', 'New York, NY', 'Austin, TX', 'Seattle, WA'][i % 4],
+      linkedinUrl: `https://linkedin.com/in/mock-lead-${i + 1}`,
+      email: `lead${i + 1}@example.com`,
+      profileImageUrl: null,
+      verified: Math.random() > 0.5,
+      industry: ['Technology', 'Healthcare', 'Finance', 'Education'][i % 4],
+      companySize: ['1-50', '51-200', '201-1000', '1000+'][i % 4]
+    }));
+    
+    return {
+      ok: true,
+      json: () => Promise.resolve({
+        leads: mockLeads,
+        total: mockLeads.length,
+        hasMore: false
+      })
+    };
+  }
+  
+  if (url.includes('/messages/send')) {
+    return {
+      ok: true,
+      json: () => Promise.resolve({
+        message_id: `mock_msg_${Date.now()}`,
+        status: 'sent',
+        sent_at: new Date().toISOString()
+      })
+    };
+  }
+  
+  if (url.includes('/messages/inbox')) {
+    return {
+      ok: true,
+      json: () => Promise.resolve({
+        messages: []
+      })
+    };
+  }
+  
+  if (url.includes('/auth/validate')) {
+    return {
+      ok: true,
+      json: () => Promise.resolve({
+        valid: true,
+        account_info: {
+          name: 'Mock Account',
+          plan: 'premium'
+        }
+      })
+    };
+  }
+  
+  if (url.includes('/metrics')) {
+    return {
+      ok: true,
+      json: () => Promise.resolve({
+        messages_sent: Math.floor(Math.random() * 100),
+        messages_opened: Math.floor(Math.random() * 80),
+        replies: Math.floor(Math.random() * 20),
+        acceptance_rate: Math.random() * 100,
+        reply_rate: Math.random() * 30
+      })
+    };
+  }
+  
+  // Default response
+  return {
+    ok: true,
+    json: () => Promise.resolve({ success: true })
+  };
+};
+
 const fetchWithRetry = async (url, options = {}, retries = 3) => {
   const baseUrl = getBaseUrl();
   const fullUrl = `${baseUrl}${url.startsWith('/') ? url : `/${url}`}`;
+
+  // Use mock API for development
+  if (!import.meta.env.VITE_LIX_API_URL || baseUrl.includes('api.lix-service.com')) {
+    console.log('Using mock Lix API for development');
+    return await mockApiResponse(url, options);
+  }
 
   for (let i = 0; i < retries; i++) {
     try {
