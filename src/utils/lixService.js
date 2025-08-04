@@ -1,72 +1,42 @@
-
 import { supabase } from './supabase';
 
 const callLixProxy = async (endpoint, method = 'GET', body = null, queryParams = null) => {
   try {
-    // Get the current session to include auth token
     const { data: { session } } = await supabase.auth.getSession();
 
-    if (!session) {
-      throw new Error('No active session. Please log in.');
-    }
+    if (!session) throw new Error('No active session. Please log in.');
 
-    console.log('Lix Service: Making request via Supabase Edge Function');
-    console.log('Endpoint:', endpoint);
-    console.log('Method:', method);
-
-    // Use the absolute URL to the Edge Function like stripeService does
     const response = await fetch('https://kgrbevxmtuhuenfqixsu.supabase.co/functions/v1/lix-api-proxy', {
       method: 'POST',
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify({
-        endpoint,
-        method,
-        body,
-        queryParams
-      })
+      body: JSON.stringify({ endpoint, method, body, queryParams })
     });
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Edge function error:', errorText);
-      throw new Error('Failed to call Lix API proxy. Please check your internet connection and try again.');
+      throw new Error(`Edge function error: ${errorText}`);
     }
 
     const data = await response.json();
-
-    if (!data.success) {
-      throw new Error(data.error || `HTTP ${data.status}: Request failed`);
-    }
-
-    console.log('Lix Service: Response received', { success: data?.success, status: data?.status });
-
+    if (!data.success) throw new Error(data.error || `HTTP ${data.status}: Request failed`);
     return data.data;
   } catch (error) {
     console.error('Lix Service Error:', error);
-    
-    // Handle specific error types like stripeService does
-    if (error.message?.includes('Failed to fetch') || 
-        error.message?.includes('NetworkError') ||
-        error.name === 'TypeError' && error.message?.includes('fetch')) {
-      throw new Error('Cannot connect to Lix API service. Please check your internet connection and try again.');
-    }
-    
-    throw error;
+    throw new Error(
+      error.message.includes('fetch') || error.message.includes('NetworkError')
+        ? 'Cannot connect to Lix API. Check your internet connection.'
+        : error.message
+    );
   }
 };
 
 const lixService = {
-  /**
-   * Search for LinkedIn leads based on filters
-   */
+  // 🔍 Search for leads
   searchLeads: async (filters) => {
     try {
-      console.log('Lix API: Starting lead search with filters:', filters);
-
-      // Build query parameters with enhanced filtering
       const queryParams = {
         job_titles: filters.jobTitles?.join(',') || '',
         industries: filters.industries?.join(',') || '',
@@ -79,52 +49,29 @@ const lixService = {
         verified_only: 'false',
       };
 
-      console.log('Lix API: Making request to /v1/li/linkedin/search/people');
-
-      const startTime = Date.now();
       const data = await callLixProxy('/v1/li/linkedin/search/people', 'GET', null, queryParams);
-      const responseTime = Date.now() - startTime;
-
-      console.log(`Lix API: Response received in ${responseTime}ms`);
-      console.log('Lix API: Raw response data:', {
-        leadsCount: data.leads?.length || 0,
-        total: data.total,
-        hasMore: data.hasMore
-      });
-
-      // Transform Lix API response to our format
-      const leads = data.leads?.map((lead, index) => {
-        console.log(`Lix API: Processing lead ${index + 1}:`, {
-          name: lead.name,
-          jobTitle: lead.jobTitle,
-          company: lead.companyName
-        });
-
-        return {
-          full_name: lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || `Lead ${index + 1}`,
-          job_title: lead.jobTitle || lead.position || 'Unknown Position',
-          company: lead.companyName || lead.company || 'Unknown Company',
-          location: lead.location || lead.city || lead.country || 'Unknown Location',
-          linkedin_url: lead.linkedinUrl || lead.profileUrl || '',
-          email: lead.email || lead.emailAddress || null,
-          phone: lead.phone || lead.phoneNumber || null,
-          profile_image_url: lead.profileImageUrl || lead.avatarUrl || null,
-          lix_lead_id: lead.id || lead.leadId || `temp_${Date.now()}_${index}`,
-          lead_data: {
-            industry: lead.industry || null,
-            companySize: lead.companySize || null,
-            experience: lead.experience || lead.yearsOfExperience || null,
-            connections: lead.connections || lead.connectionCount || null,
-            verified: lead.verified || false,
-            seniority: lead.seniority || null,
-            department: lead.department || null,
-            skills: lead.skills || [],
-            lastActivity: lead.lastActivity || null,
-          },
-        };
-      }) || [];
-
-      console.log(`Lix API: Successfully transformed ${leads.length} leads`);
+      const leads = data.leads?.map((lead, index) => ({
+        full_name: lead.name || `${lead.firstName || ''} ${lead.lastName || ''}`.trim() || `Lead ${index + 1}`,
+        job_title: lead.jobTitle || 'Unknown Position',
+        company: lead.companyName || 'Unknown Company',
+        location: lead.location || 'Unknown Location',
+        linkedin_url: lead.linkedinUrl || '',
+        email: lead.email || null,
+        phone: lead.phone || null,
+        profile_image_url: lead.profileImageUrl || null,
+        lix_lead_id: lead.id || `temp_${Date.now()}_${index}`,
+        lead_data: {
+          industry: lead.industry || null,
+          companySize: lead.companySize || null,
+          experience: lead.experience || null,
+          connections: lead.connections || null,
+          verified: lead.verified || false,
+          seniority: lead.seniority || null,
+          department: lead.department || null,
+          skills: lead.skills || [],
+          lastActivity: lead.lastActivity || null,
+        },
+      })) || [];
 
       return {
         success: true,
@@ -132,48 +79,22 @@ const lixService = {
           leads,
           total: data.total || leads.length,
           hasMore: data.hasMore || false,
-          searchTime: responseTime,
-          filtersApplied: {
-            jobTitles: filters.jobTitles?.length || 0,
-            industries: filters.industries?.length || 0,
-            locations: filters.locations?.length || 0,
-          }
         },
       };
     } catch (error) {
-      console.error('Lix API: Error searching leads:', error);
-
-      let errorMessage = 'Failed to connect to Lix API';
-      let errorCode = 'UNKNOWN_ERROR';
-
-      if (error.message.includes('No active session')) {
-        errorMessage = 'Please log in to continue';
-        errorCode = 'AUTH_ERROR';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = 'Request timeout - please check your internet connection';
-        errorCode = 'TIMEOUT_ERROR';
-      } else if (error.message.includes('network') || error.message.includes('fetch')) {
-        errorMessage = 'Network error - please check your internet connection and try again';
-        errorCode = 'NETWORK_ERROR';
-      }
-
       return {
         success: false,
-        error: errorMessage,
-        errorCode: errorCode,
-        retryable: errorCode !== 'AUTH_ERROR',
+        error: error.message || 'Lead search failed',
       };
     }
   },
 
-  /**
-   * Send LinkedIn message through Lix API
-   */
+  // 📩 Send LinkedIn message
   sendLinkedInMessage: async (leadId, message, campaignId) => {
     try {
       const data = await callLixProxy('/v1/messages/send', 'POST', {
         recipient_id: leadId,
-        message: message,
+        message,
         campaign_id: campaignId,
         message_type: 'direct_message',
       });
@@ -187,31 +108,17 @@ const lixService = {
         },
       };
     } catch (error) {
-      console.error('Error sending LinkedIn message:', error);
-
-      let errorMessage = 'Failed to send LinkedIn message';
-      if (error.message.includes('No active session')) {
-        errorMessage = 'Please log in to continue';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = 'Request timeout - please try again';
-      } else if (error.message.includes('network')) {
-        errorMessage = 'Network error - please check your connection and try again';
-      }
-
       return {
         success: false,
-        error: errorMessage,
+        error: error.message || 'Message sending failed',
       };
     }
   },
 
-  /**
-   * Get LinkedIn inbox messages and replies
-   */
+  // 📥 Get inbox messages
   getInboxMessages: async (campaignId) => {
     try {
-      const data = await callLixProxy(`/v1/messages/inbox`, 'GET', null, { campaign_id: campaignId });
-
+      const data = await callLixProxy('/v1/messages/inbox', 'GET', null, { campaign_id: campaignId });
       const messages = data.messages?.map((msg) => ({
         id: msg.id,
         sender_id: msg.sender_id,
@@ -223,44 +130,28 @@ const lixService = {
         thread_id: msg.thread_id,
       })) || [];
 
-      return {
-        success: true,
-        data: { messages },
-      };
+      return { success: true, data: { messages } };
     } catch (error) {
-      console.error('Error getting inbox messages:', error);
-
-      let errorMessage = 'Failed to get inbox messages';
-      if (error.message.includes('No active session')) {
-        errorMessage = 'Please log in to continue';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = 'Request timeout - please try again';
-      } else if (error.message.includes('network')) {
-        errorMessage = 'Network error - please check your connection and try again';
-      }
-
       return {
         success: false,
-        error: errorMessage,
+        error: error.message || 'Failed to fetch inbox messages',
       };
     }
   },
 
-  /**
-   * Create campaign in Lix system
-   */
+  // 🧠 Create campaign
   createLixCampaign: async (campaignData) => {
     try {
       const data = await callLixProxy('/v1/campaigns', 'POST', {
         name: campaignData.name,
         description: campaignData.message,
-        target_filters: {
+        message_template: campaignData.message_template,
+        daily_limit: campaignData.daily_limit || 50,
+        targeting: {
           job_titles: campaignData.target_job_titles,
           industries: campaignData.target_industries,
           locations: campaignData.target_locations,
-        },
-        message_template: campaignData.message_template,
-        daily_limit: 50,
+        }
       });
 
       return {
@@ -271,31 +162,14 @@ const lixService = {
         },
       };
     } catch (error) {
-      console.error('Error creating Lix campaign:', error);
-
-      let errorMessage = 'Failed to create Lix campaign';
-      let troubleshooting = '';
-
-      if (error.message.includes('No active session')) {
-        errorMessage = 'Please log in to continue';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = 'Request timeout - Lix API is not responding';
-        troubleshooting = 'The API request took too long to respond.';
-      } else if (error.message.includes('network')) {
-        errorMessage = 'Cannot connect to Lix API';
-        troubleshooting = 'Please check your internet connection.';
-      }
-
-      console.error('Lix API troubleshooting:', troubleshooting);
-
       return {
         success: false,
-        error: errorMessage,
-        troubleshooting: troubleshooting,
+        error: error.message || 'Failed to create campaign',
       };
     }
   },
 
+  // 📊 Campaign metrics
   getCampaignMetrics: async (lixCampaignId) => {
     try {
       const data = await callLixProxy(`/v1/campaigns/${lixCampaignId}/metrics`, 'GET');
@@ -311,33 +185,20 @@ const lixService = {
         },
       };
     } catch (error) {
-      console.error('Error getting campaign metrics:', error);
-
-      let errorMessage = 'Failed to get campaign metrics';
-      if (error.message.includes('No active session')) {
-        errorMessage = 'Please log in to continue';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = 'Request timeout - please try again';
-      } else if (error.message.includes('network')) {
-        errorMessage = 'Network error - please check your connection and try again';
-      }
-
       return {
         success: false,
-        error: errorMessage,
+        error: error.message || 'Failed to fetch campaign metrics',
       };
     }
   },
 
-  /**
-   * Start LinkedIn lead fetching for a campaign
-   */
+  // 🚀 Start fetching leads
   startLeadFetching: async (lixCampaignId, targetingCriteria) => {
     try {
       const data = await callLixProxy(`/v1/campaigns/${lixCampaignId}/start-fetching`, 'POST', {
         targeting_criteria: targetingCriteria,
         max_leads: targetingCriteria.max_leads || 100,
-        fetch_immediately: true
+        fetch_immediately: true,
       });
 
       return {
@@ -345,35 +206,21 @@ const lixService = {
         data: {
           fetchingStarted: true,
           estimatedLeads: data.estimated_leads || 0,
-          message: data.message || 'Lead fetching started successfully'
+          message: data.message || 'Lead fetching started successfully',
         },
       };
     } catch (error) {
-      console.error('Error starting lead fetching:', error);
-
-      let errorMessage = 'Failed to start lead fetching';
-      if (error.message.includes('No active session')) {
-        errorMessage = 'Please log in to continue';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = 'Request timeout - please try again';
-      } else if (error.message.includes('network')) {
-        errorMessage = 'Network error - please check your connection and try again';
-      }
-
       return {
         success: false,
-        error: errorMessage,
+        error: error.message || 'Failed to start lead fetching',
       };
     }
   },
 
-  /**
-   * Validate Lix API connection
-   */
+  // 🔐 Validate connection
   validateConnection: async () => {
     try {
       const data = await callLixProxy('/v1/auth/validate', 'GET');
-
       return {
         success: true,
         data: {
@@ -382,20 +229,9 @@ const lixService = {
         },
       };
     } catch (error) {
-      console.error('Error validating Lix connection:', error);
-
-      let errorMessage = 'Failed to validate Lix API connection';
-      if (error.message.includes('No active session')) {
-        errorMessage = 'Please log in to continue';
-      } else if (error.message.includes('timeout')) {
-        errorMessage = 'Connection timeout - please check your internet connection';
-      } else if (error.message.includes('network')) {
-        errorMessage = 'Network error - unable to connect to Lix API';
-      }
-
       return {
         success: false,
-        error: errorMessage,
+        error: error.message || 'Validation failed',
       };
     }
   },
