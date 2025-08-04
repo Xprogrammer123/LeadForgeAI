@@ -221,6 +221,68 @@ function CampaignsPage() {
     }
   };
 
+  const handleStartEnrichment = async (campaignId) => {
+    try {
+      setError('');
+      
+      // Get campaign details first
+      const campaign = campaigns.find(c => c.id === campaignId);
+      if (!campaign) {
+        setError('Campaign not found');
+        return;
+      }
+
+      // Check credit balance for enrichment (15 credits)
+      if (creditBalance < 15) {
+        setError('Insufficient credits. You need at least 15 credits to start enrichment.');
+        return;
+      }
+
+      // Deduct credits for enrichment
+      const deductResult = await creditService.deductCredits(user.id, 15, `Enrichment for: ${campaign.name}`);
+      if (!deductResult.success) {
+        setError('Failed to deduct credits for enrichment');
+        return;
+      }
+
+      // Build targeting filters from campaign data
+      const filters = {
+        jobTitles: campaign.target_job_titles || [],
+        industries: campaign.target_industries || [],
+        locations: campaign.target_locations || [],
+        companySizes: [],
+        experienceLevels: [],
+        limit: 5 // Fetch 5 contacts as requested
+      };
+
+      // Start lead generation
+      const result = await campaignService.generateLeadsForCampaign(campaignId, filters);
+
+      if (result.success) {
+        // Update local campaign status and credit balance
+        setCampaigns(campaigns.map(c => 
+          c.id === campaignId 
+            ? { ...c, status: 'enriching', leads_generated: result.data.leadsGenerated }
+            : c
+        ));
+        setCreditBalance(prev => prev - 15);
+        setError('');
+        
+        // Show success message
+        alert(`Successfully started enrichment! Generated ${result.data.leadsGenerated} leads.`);
+      } else {
+        // Refund credits on failure
+        await creditService.addCredits(user.id, 15, 'Enrichment failed - refund', 0);
+        setError('Failed to start enrichment: ' + result.error);
+      }
+    } catch (err) {
+      console.error('Error starting enrichment:', err);
+      // Refund credits on error
+      await creditService.addCredits(user.id, 15, 'Enrichment error - refund', 0);
+      setError('An error occurred while starting enrichment: ' + err.message);
+    }
+  };
+
   const handleDeleteCampaign = async (campaignId) => {
     if (!window.confirm('Are you sure you want to delete this campaign?')) {
       return;
@@ -251,6 +313,8 @@ function CampaignsPage() {
     switch (status) {
       case 'active':
         return 'bg-success/20 text-success border-success/30';
+      case 'enriching':
+        return 'bg-primary/20 text-primary border-primary/30';
       case 'paused':
         return 'bg-warning/20 text-warning border-warning/30';
       case 'draft':
@@ -431,18 +495,32 @@ function CampaignsPage() {
                             onClick={() => navigate(`/campaigns/${campaign.id}`)}
                             iconName="Eye"
                           />
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() =>
-                              handleUpdateCampaignStatus(
-                                campaign.id,
-                                campaign.status === 'active' ? 'paused' : 'active'
-                              )
-                            }
-                          >
-                            {campaign.status === 'active' ? 'Pause' : 'Resume'}
-                          </Button>
+                          {campaign.status === 'draft' && (
+                            <Button
+                              size="sm"
+                              variant="default"
+                              onClick={() => handleStartEnrichment(campaign.id)}
+                              disabled={creditBalance < 15}
+                              className="cta-button"
+                              iconName="Zap"
+                            >
+                              Start Enrichment
+                            </Button>
+                          )}
+                          {campaign.status !== 'draft' && campaign.status !== 'enriching' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              onClick={() =>
+                                handleUpdateCampaignStatus(
+                                  campaign.id,
+                                  campaign.status === 'active' ? 'paused' : 'active'
+                                )
+                              }
+                            >
+                              {campaign.status === 'active' ? 'Pause' : 'Resume'}
+                            </Button>
+                          )}
                           <Button
                             size="sm"
                             variant="outline"
