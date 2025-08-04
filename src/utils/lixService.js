@@ -92,7 +92,7 @@ const lixService = {
   // 🚀 Start fetching leads
   startLeadFetching: async (lixCampaignId, targetingCriteria) => {
     try {
-      const data = await callLixProxy(`/v1/li/linkedin/search/people${lixCampaignId}`, 'POST', {
+      const data = await callLixProxy(`/v1/li/linkedin/search/people/${lixCampaignId}`, 'POST', {
         targeting_criteria: targetingCriteria,
         max_leads: targetingCriteria.max_leads || 100,
         fetch_immediately: true,
