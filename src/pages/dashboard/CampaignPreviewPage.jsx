@@ -38,8 +38,8 @@ function CampaignPreviewPage() {
       setCampaign(campaignResult.data);
       
       // Load campaign metrics from Lix
-      if (campaignResult.data.lix_campaign_id) {
-        const metricsResult = await lixService.getCampaignMetrics(campaignResult.data.lix_campaign_id);
+      if (campaignResult.data.campaign_id) {
+        const metricsResult = await lixService.getCampaignMetrics(campaignResult.data.campaign_id);
         if (metricsResult.success) {
           setMetrics(metricsResult.data);
         }
@@ -64,7 +64,7 @@ function CampaignPreviewPage() {
       setError('');
       
       // Start LinkedIn lead fetching process
-      const result = await lixService.startLeadFetching(campaign.lix_campaign_id, {
+      const result = await lixService.startLeadFetching(campaign.campaign_id, {
         target_job_titles: campaign.target_job_titles,
         target_industries: campaign.target_industries,
         target_locations: campaign.target_locations,

@@ -6,7 +6,6 @@ import DashboardLayout from '../../components/dashboard/DashboardLayout';
 import Button from '../../components/ui/Button';
 import Input from '../../components/ui/Input';
 import Icon from '../../components/AppIcon';
-import lixService from '../../utils/lixService';
 import creditService from '../../utils/creditService';
 import openaiService from '../../utils/openaiService';
 import campaignService from '../../utils/campaignService';
@@ -120,7 +119,7 @@ function CampaignsPage() {
       // Store campaign in Supabase
       const supabaseResult = await campaignService.createCampaign({
         ...campaignData,
-        lix_campaign_id: null,
+        campaign_id: null,
         credits_used: 5,
         status: 'draft',
       });
