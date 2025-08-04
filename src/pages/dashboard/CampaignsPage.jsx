@@ -105,35 +105,28 @@ function CampaignsPage() {
         throw new Error('User ID is missing');
       }
 
-      const creditCheck = await creditService.checkCreditSufficiency(user.id, 20);
+      const creditCheck = await creditService.checkCreditSufficiency(user.id, 5);
       if (!creditCheck.success || !creditCheck.data.hasEnoughCredits) {
-        setError(`Insufficient credits. You need ${creditCheck.data.shortfall || 20} more credits.`);
+        setError(`Insufficient credits. You need ${creditCheck.data.shortfall || 5} more credits.`);
         return;
       }
 
-      const deductResult = await creditService.deductCredits(user.id, 20, `Campaign: ${campaignData.name}`);
+      const deductResult = await creditService.deductCredits(user.id, 5, `Campaign: ${campaignData.name}`);
       if (!deductResult.success) {
         setError('Failed to deduct credits');
         return;
       }
 
-      // Create campaign in Lix API
-      const lixResult = await lixService.createLixCampaign(campaignData);
-      if (!lixResult.success) {
-        await creditService.addCredits(user.id, 20, 'Campaign creation failed', 0); // Refund credits
-        throw new Error(lixResult.error || 'Failed to create Lix campaign');
-      }
-
       // Store campaign in Supabase
       const supabaseResult = await campaignService.createCampaign({
         ...campaignData,
-        lix_campaign_id: lixResult.data.lixCampaignId,
-        credits_used: 20,
-        status: 'active', // Default to active after creation
+        lix_campaign_id: null,
+        credits_used: 5,
+        status: 'draft',
       });
 
       if (!supabaseResult.success) {
-        await creditService.addCredits(user.id, 20, 'Supabase storage failed', 0); // Refund credits
+        await creditService.addCredits(user.id, 5, 'Supabase storage failed', 0); // Refund credits
         throw new Error(supabaseResult.error || 'Failed to store campaign in Supabase');
       }
 
@@ -149,7 +142,7 @@ function CampaignsPage() {
         status: 'draft',
       });
       setShowModal(false);
-      setCreditBalance((prev) => prev - 20);
+      setCreditBalance((prev) => prev - 5);
       setError('');
     } catch (err) {
       console.error('Error in handleCreateCampaign:', err);
@@ -480,7 +473,7 @@ function CampaignsPage() {
           >
             <div className="flex items-center justify-between mb-6">
               <h3 className="text-lg font-headline-bold text-foreground">
-                Create New Campaign ({creditBalance} credits available)
+                Create New Campaign (5 credits + 15 for enrichment)
               </h3>
               <Button
                 variant="ghost"
@@ -678,7 +671,7 @@ function CampaignsPage() {
                   type="submit"
                   variant="default"
                   className="cta-button"
-                  disabled={creditBalance < 20}
+                  disabled={creditBalance < 5}
                 >
                   Create Campaign
                 </Button>

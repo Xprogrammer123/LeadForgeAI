@@ -38,107 +38,28 @@ const campaignService = {
     }
   },
 
-  // Create a new campaign with credit validation and lead fetching
+  // Create a new campaign (without immediate lead fetching)
   createCampaign: async (campaignData) => {
     try {
-      const userId = campaignData.user_id;
-
-      // Check if user has enough credits
-      const creditCheck = await creditService.checkCreditSufficiency(userId, 20);
-      if (!creditCheck.success) {
-        return creditCheck;
-      }
-
-      if (!creditCheck.data.hasEnoughCredits) {
-        return {
-          success: false,
-          error: `Insufficient credits. You need ${creditCheck.data.shortfall} more credits to create this campaign.`,
-          insufficientCredits: true,
-        };
-      }
-
-      // Deduct credits first
-      const deductResult = await creditService.deductCredits(userId, 20, `Campaign: ${campaignData.name}`);
-      if (!deductResult.success) {
-        return deductResult;
-      }
-
-      // Create campaign in Lix if filters are provided
-      let lixCampaignId = null;
-      if (
-        campaignData.target_job_titles?.length > 0 ||
-        campaignData.target_industries?.length > 0 ||
-        campaignData.target_locations?.length > 0
-      ) {
-        const lixResult = await lixService.createLixCampaign({
-          name: campaignData.name,
-          message: campaignData.message,
-          target_job_titles: campaignData.target_job_titles || [],
-          target_industries: campaignData.target_industries || [],
-          target_locations: campaignData.target_locations || [],
-          message_template: campaignData.message_template || campaignData.message,
-        });
-
-        if (lixResult.success) {
-          lixCampaignId = lixResult.data.lixCampaignId;
-        } else {
-          // Refund credits if Lix campaign creation fails
-          await creditService.addCredits(userId, 20, null, 0);
-          return { success: false, error: `Failed to create Lix campaign: ${lixResult.error}` };
-        }
-      }
-
       // Create campaign in database
       const { data, error } = await supabase
         .from('campaigns')
         .insert([
           {
             ...campaignData,
-            lix_campaign_id: lixCampaignId,
-            credits_used: 20,
-            status: 'active', // Auto-start campaign
+            status: campaignData.status || 'draft',
           },
         ])
         .select()
         .single();
 
       if (error) {
-        // Refund credits if campaign creation failed
-        await creditService.addCredits(userId, 20, null, 0);
         return { success: false, error: error.message };
-      }
-
-      // Immediately start lead generation process
-      const leadGenerationResult = await campaignService.generateLeadsForCampaign(data.id, {
-        jobTitles: campaignData.target_job_titles,
-        industries: campaignData.target_industries,
-        locations: campaignData.target_locations,
-        limit: 50,
-      });
-
-      // Update campaign data with lead generation results
-      const updatedCampaign = {
-        ...data,
-        leads_generated: leadGenerationResult.success ? leadGenerationResult.data.leadsGenerated : 0,
-        lead_generation_status: leadGenerationResult.success ? 'completed' : 'failed',
-        lead_generation_error: leadGenerationResult.success ? null : leadGenerationResult.error,
-      };
-
-      // Update campaign stats in database
-      if (leadGenerationResult.success && leadGenerationResult.data.leadsGenerated > 0) {
-        await supabase
-          .from('campaigns')
-          .update({
-            leads_generated: leadGenerationResult.data.leadsGenerated,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', data.id);
       }
 
       return { 
         success: true, 
-        data: updatedCampaign,
-        leadGeneration: leadGenerationResult
+        data: data
       };
     } catch (error) {
       if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
@@ -173,7 +94,7 @@ const campaignService = {
       await supabase
         .from('campaigns')
         .update({ 
-          status: 'generating_leads',
+          status: 'enriching',
           updated_at: new Date().toISOString()
         })
         .eq('id', campaignId);

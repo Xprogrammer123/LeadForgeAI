@@ -43,7 +43,7 @@ const lixService = {
         locations: filters.locations?.join(',') || '',
         company_sizes: filters.companySizes?.join(',') || '',
         experience_levels: filters.experienceLevels?.join(',') || '',
-        limit: filters.limit || 50,
+        limit: filters.limit || 5, // Default to 5 instead of 50
         include_email: 'true',
         include_phone: 'true',
         verified_only: 'false',
