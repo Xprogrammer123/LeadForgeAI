@@ -1,18 +1,30 @@
 import { supabase } from './supabase';
+import campaignService from './campaignService';
 
+// 🔐 ENV-SAFE KEYS
+const SUPABASE_PROJECT_URL = 'https://kgrbevxmtuhuenfqixsu.supabase.co';
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
+const SUPABASE_SERVICE_ROLE_KEY = import.meta.env.VITE_SUPABASE_SERVICE_ROLE_KEY;
+
+// 🔁 Proxy Lix API via Edge Function
 const callLixProxy = async (endpoint, method = 'GET', body = null, queryParams = null) => {
   try {
     const { data: { session } } = await supabase.auth.getSession();
-
     if (!session) throw new Error('No active session. Please log in.');
 
-    const response = await fetch('https://kgrbevxmtuhuenfqixsu.supabase.co/functions/v1/lix-api-proxy', {
-      method: 'POST',
+    let url = `/.netlify/functions${endpoint}`;
+    if (queryParams) {
+      const searchParams = new URLSearchParams(queryParams);
+      url += `?${searchParams.toString()}`;
+    }
+
+    const response = await fetch(url, {
+      method,
       headers: {
         'Authorization': `Bearer ${session.access_token}`,
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
       },
-      body: JSON.stringify({ endpoint, method, body, queryParams })
+      body: body ? JSON.stringify(body) : null,
     });
 
     if (!response.ok) {
@@ -34,7 +46,7 @@ const callLixProxy = async (endpoint, method = 'GET', body = null, queryParams =
 };
 
 const lixService = {
-  // 🔍 Search for leads
+  // 🔹 Search for leads from Lix
   searchLeads: async (filters) => {
     try {
       const queryParams = {
@@ -43,7 +55,7 @@ const lixService = {
         locations: filters.locations?.join(',') || '',
         company_sizes: filters.companySizes?.join(',') || '',
         experience_levels: filters.experienceLevels?.join(',') || '',
-        limit: filters.limit || 5, // Default to 5 instead of 50
+        limit: filters.limit || 5,
         include_email: 'true',
         include_phone: 'true',
         verified_only: 'false',
@@ -89,14 +101,18 @@ const lixService = {
     }
   },
 
-  // 🚀 Start fetching leads
-  startLeadFetching: async (lixCampaignId, targetingCriteria) => {
+  // 🔹 Start fetching leads & mark campaign as completed
+  startLeadFetching: async (lixCampaignId, targetingCriteria, campaignId) => {
     try {
       const data = await callLixProxy(`/v1/li/linkedin/search/people/${lixCampaignId}`, 'POST', {
         targeting_criteria: targetingCriteria,
         max_leads: targetingCriteria.max_leads || 100,
         fetch_immediately: true,
       });
+
+      if (campaignId) {
+        await campaignService.updateCampaignStatus(campaignId, 'completed');
+      }
 
       return {
         success: true,
@@ -114,7 +130,7 @@ const lixService = {
     }
   },
 
-  // 🔐 Validate connection
+  // 🔹 Validate Lix API connection
   validateConnection: async () => {
     try {
       const data = await callLixProxy('/v1/auth/validate', 'GET');

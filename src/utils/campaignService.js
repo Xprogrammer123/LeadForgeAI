@@ -1,182 +1,126 @@
 import { supabase } from './supabase';
-import creditService from './creditService';
 import lixService from './lixService';
-import openaiService from './openaiService';
 
 const campaignService = {
-  // Get all campaigns for the current user
+  // 🔹 Get all campaigns for the current user
   getCampaigns: async () => {
     try {
       const { data, error } = await supabase
         .from('campaigns')
-        .select(`
-          *,
-          linkedin_leads(count)
-        `)
+        .select(`*, linkedin_leads(count), id`)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
+      if (error) return { success: false, error: error.message };
 
-      // Transform data to include lead counts
       const campaignsWithStats = data?.map((campaign) => ({
         ...campaign,
         leads_generated: campaign.linkedin_leads?.[0]?.count || 0,
+        campaign_id: campaign.id, // Ensuring campaign_id is always present explicitly
       })) || [];
 
       return { success: true, data: campaignsWithStats };
     } catch (error) {
-      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
-        return {
-          success: false,
-          error:
-            'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.',
-        };
-      }
-      return { success: false, error: 'Failed to load campaigns' };
+      const message = error?.message?.includes('Failed to fetch')
+        ? 'Cannot connect to Supabase. Check project status.'
+        : 'Failed to load campaigns';
+      return { success: false, error: message };
     }
   },
 
-  // Create a new campaign (without immediate lead fetching)
+  // 🔹 Create campaign
   createCampaign: async (campaignData) => {
     try {
-      // Create campaign in database
       const { data, error } = await supabase
         .from('campaigns')
-        .insert([
-          {
-            ...campaignData,
-            status: campaignData.status || 'draft',
-          },
-        ])
+        .insert([{ ...campaignData, status: campaignData.status || 'draft' }])
         .select()
         .single();
 
-      if (error) {
-        return { success: false, error: error.message };
-      }
-
-      return { 
-        success: true, 
-        data: data
-      };
+      if (error) return { success: false, error: error.message };
+      return { success: true, data };
     } catch (error) {
-      if (error?.message?.includes('Failed to fetch') || error?.message?.includes('NetworkError')) {
-        return {
-          success: false,
-          error:
-            'Cannot connect to database. Your Supabase project may be paused or deleted. Please visit your Supabase dashboard to check project status.',
-        };
-      }
-      return { success: false, error: 'Failed to create campaign' };
+      const message = error?.message?.includes('Failed to fetch')
+        ? 'Cannot connect to Supabase. Check project status.'
+        : 'Failed to create campaign';
+      return { success: false, error: message };
     }
   },
 
-  // Generate leads for campaign using Lix API
+  // 🔹 Generate leads from Lix
   generateLeadsForCampaign: async (campaignId, filters) => {
     try {
-      console.log('Starting lead generation for campaign:', campaignId, 'with filters:', filters);
+      console.log('⏳ Starting enrichment:', { campaignId, filters });
 
-      // Get campaign details
       const { data: campaign, error: campaignError } = await supabase
         .from('campaigns')
-        .select('*, user_profiles(id)')
+        .select('id, user_id')
         .eq('id', campaignId)
         .single();
 
-      if (campaignError || !campaign) {
-        console.error('Campaign not found:', campaignError);
+      if (campaignError || !campaign)
         return { success: false, error: 'Campaign not found' };
-      }
 
-      // Update campaign status to indicate lead generation is in progress
+      // Update to "enriching"
       await supabase
         .from('campaigns')
-        .update({ 
+        .update({
           status: 'enriching',
-          updated_at: new Date().toISOString()
+          updated_at: new Date().toISOString(),
         })
         .eq('id', campaignId);
 
-      // Fetch leads from Lix API with enhanced error handling
-      console.log('Fetching leads from Lix API...');
       const lixResult = await lixService.searchLeads(filters);
-
       if (!lixResult.success) {
-        console.error('Failed to fetch leads from Lix:', lixResult.error);
-
-        // Update campaign status to failed
         await supabase
           .from('campaigns')
-          .update({ 
+          .update({
             status: 'failed',
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', campaignId);
 
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: `Lix API Error: ${lixResult.error}`,
-          retryable: true
+          retryable: true,
         };
       }
 
-      console.log(`Fetched ${lixResult.data.leads.length} leads from Lix API`);
-
-      // Transform and prepare leads for database insertion
-      const leadsToInsert = lixResult.data.leads.map((lead) => ({
+      const leads = lixResult.data.leads || [];
+      const leadsToInsert = leads.map((lead) => ({
         ...lead,
-        campaign_id: campaignId,
+        campaign_id: campaign.id,
         user_id: campaign.user_id,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       }));
 
       if (leadsToInsert.length > 0) {
-        console.log(`Inserting ${leadsToInsert.length} leads into database...`);
-
         const { error: insertError } = await supabase
           .from('linkedin_leads')
           .insert(leadsToInsert);
 
         if (insertError) {
-          console.error('Failed to save leads:', insertError);
-
-          // Update campaign status to failed
           await supabase
             .from('campaigns')
-            .update({ 
+            .update({
               status: 'failed',
-              updated_at: new Date().toISOString()
+              updated_at: new Date().toISOString(),
             })
             .eq('id', campaignId);
 
-          return { success: false, error: 'Failed to save leads to database' };
+          return { success: false, error: 'Failed to insert leads' };
         }
-
-        // Update campaign with successful lead generation
-        await supabase
-          .from('campaigns')
-          .update({
-            status: 'active',
-            leads_generated: leadsToInsert.length,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', campaignId);
-
-        console.log(`Successfully generated ${leadsToInsert.length} leads for campaign ${campaignId}`);
-      } else {
-        // No leads found but API call was successful
-        await supabase
-          .from('campaigns')
-          .update({
-            status: 'active',
-            leads_generated: 0,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', campaignId);
       }
+
+      await supabase
+        .from('campaigns')
+        .update({
+          status: 'active',
+          leads_generated: leadsToInsert.length,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', campaignId);
 
       return {
         success: true,
@@ -184,36 +128,29 @@ const campaignService = {
           leadsGenerated: leadsToInsert.length,
           totalAvailable: lixResult.data.total,
           hasMore: lixResult.data.hasMore,
-          campaignId: campaignId,
+          campaignId,
         },
       };
     } catch (error) {
-      console.error('Error generating leads for campaign:', error);
+      console.error('Lead generation error:', error.message);
 
-      // Update campaign status to failed
-      try {
-        await supabase
-          .from('campaigns')
-          .update({ 
-            status: 'failed',
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', campaignId);
-      } catch (updateError) {
-        console.error('Failed to update campaign status:', updateError);
-      }
+      await supabase
+        .from('campaigns')
+        .update({
+          status: 'failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', campaignId);
 
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: 'Failed to generate leads: ' + error.message,
-        retryable: true
+        retryable: true,
       };
     }
   },
 
-  /**
-   * Delete a campaign
-   */
+  // 🔹 Delete campaign
   deleteCampaign: async (campaignId) => {
     try {
       const { data, error } = await supabase
@@ -222,21 +159,14 @@ const campaignService = {
         .eq('id', campaignId)
         .select();
 
-      if (error) {
-        console.error('Error deleting campaign:', error);
-        return { success: false, error: error.message };
-      }
-
+      if (error) return { success: false, error: error.message };
       return { success: true, data: data[0] };
     } catch (error) {
-      console.error('Error in deleteCampaign:', error);
       return { success: false, error: 'Failed to delete campaign' };
     }
   },
 
-  /**
-   * Get a single campaign by ID
-   */
+  // 🔹 Get one campaign by ID
   getCampaignById: async (campaignId) => {
     try {
       const { data, error } = await supabase
@@ -245,42 +175,57 @@ const campaignService = {
         .eq('id', campaignId)
         .single();
 
-      if (error) {
-        console.error('Error fetching campaign:', error);
-        return { success: false, error: error.message };
-      }
-
+      if (error) return { success: false, error: error.message };
       return { success: true, data };
     } catch (error) {
-      console.error('Error in getCampaignById:', error);
       return { success: false, error: 'Failed to fetch campaign' };
     }
   },
 
-  /**
-   * Get leads for a specific campaign
-   */
+  // 🔹 Get leads for one campaign
   getCampaignLeads: async (campaignId) => {
     try {
       const { data, error } = await supabase
         .from('linkedin_leads')
         .select(`
           *,
+          campaign_id,
           campaigns(name, id),
           meetings(id, scheduled_at, meeting_status)
         `)
         .eq('campaign_id', campaignId)
         .order('created_at', { ascending: false });
 
-      if (error) {
-        console.error('Error fetching campaign leads:', error);
-        return { success: false, error: error.message };
-      }
+      if (error) return { success: false, error: error.message };
 
-      return { success: true, data: data || [] };
+      const leadsWithCampaignId = (data || []).map(lead => ({
+        ...lead,
+        campaign_id: lead.campaign_id // Ensures campaign_id is always available explicitly
+      }));
+
+      return { success: true, data: leadsWithCampaignId };
     } catch (error) {
-      console.error('Error in getCampaignLeads:', error);
       return { success: false, error: 'Failed to fetch campaign leads' };
+    }
+  },
+
+  // 🔹 Update campaign status
+  updateCampaignStatus: async (campaignId, status) => {
+    try {
+      const { data, error } = await supabase
+        .from('campaigns')
+        .update({
+          status,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', campaignId)
+        .select()
+        .single();
+
+      if (error) return { success: false, error: error.message };
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, error: 'Failed to update campaign status' };
     }
   },
 };
