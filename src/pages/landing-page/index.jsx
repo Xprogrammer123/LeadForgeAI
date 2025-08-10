@@ -20,14 +20,14 @@ const LandingPage = () => {
   return (
     <>
       <Helmet>
-        <title>AgenticAI SDR - Turn LinkedIn Into Your 24/7 AI Sales Machine</title>
+        <title>LeadForge AI - Turn LinkedIn Into Your 24/7 AI Sales Machine</title>
         <meta name="description" content="Generate 3x more qualified leads while you sleep with AI-powered LinkedIn prospecting. No manual prospecting required. Join 2,847+ sales professionals." />
         <meta name="keywords" content="AI sales, LinkedIn automation, sales prospecting, lead generation, SDR, sales development" />
-        <meta property="og:title" content="AgenticAI SDR - Turn LinkedIn Into Your 24/7 AI Sales Machine" />
+        <meta property="og:title" content="LeadForge AI - Turn LinkedIn Into Your 24/7 AI Sales Machine" />
         <meta property="og:description" content="Generate 3x more qualified leads while you sleep with AI-powered LinkedIn prospecting. No manual prospecting required." />
         <meta property="og:type" content="website" />
         <meta name="twitter:card" content="summary_large_image" />
-        <meta name="twitter:title" content="AgenticAI SDR - Turn LinkedIn Into Your 24/7 AI Sales Machine" />
+        <meta name="twitter:title" content="LeadForge AI - Turn LinkedIn Into Your 24/7 AI Sales Machine" />
         <meta name="twitter:description" content="Generate 3x more qualified leads while you sleep with AI-powered LinkedIn prospecting." />
         <link rel="canonical" href="https://agenticsdr.com/landing-page" />
       </Helmet>
@@ -44,11 +44,8 @@ const LandingPage = () => {
           <SolutionSection />
           <StatsSection />
           <HowItWorksSection />
-          <SocialProofSection />
           <PricingSection />
           <FAQSection />
-          <TrustBadgesSection />
-          <ROICalculatorSection />
           <UseCaseSection />
           <FinalCTASection />
         </main>

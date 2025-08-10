@@ -147,7 +147,7 @@ const FinalCTASection = () => {
             </div>
           </div>
 
-          {/* Urgency Features */}
+          {/* Urgency Features 
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
             {urgencyFeatures.map((feature, index) => (
               <motion.div
@@ -164,9 +164,9 @@ const FinalCTASection = () => {
                 <p className="text-sm font-body-medium text-foreground">{feature.text}</p>
               </motion.div>
             ))}
-          </div>
+          </div>*/}
 
-          {/* Email Capture Form */}
+          {/* Email Capture Form 
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             whileInView={{ opacity: 1, y: 0 }}
@@ -243,7 +243,7 @@ const FinalCTASection = () => {
                 </div>
               </motion.div>
             )}
-          </motion.div>
+          </motion.div>*/}
 
           {/* Social Proof */}
           <motion.div
@@ -268,6 +268,7 @@ const FinalCTASection = () => {
               </div>
             </div>
           </motion.div>
+          
         </motion.div>
       </div>
     </section>

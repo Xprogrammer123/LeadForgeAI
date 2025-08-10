@@ -1,15 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import Icon from '../AppIcon';
+import { useNavigate } from 'react-router-dom';
 
 const StickyAnchorNav = () => {
   const [isVisible, setIsVisible] = useState(false);
   const [activeSection, setActiveSection] = useState('');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const navigate = useNavigate();
+
+  // 🔹 Simulated login state — replace with your actual auth check
+  const [isLoggedIn, setIsLoggedIn] = useState(false);
 
   const navigationItems = [
     { label: "How It Works", href: "#how-it-works", section: "solution" },
     { label: "Pricing", href: "#pricing", section: "pricing" },
-    { label: "Proof", href: "#proof", section: "social-proof" },
     { label: "FAQ", href: "#faq", section: "faq" },
     { label: "Get Access", href: "#get-access", section: "conversion" }
   ];
@@ -19,7 +23,6 @@ const StickyAnchorNav = () => {
       const heroHeight = window.innerHeight * 0.8;
       setIsVisible(window.scrollY > heroHeight);
 
-      // Update active section based on scroll position
       const sections = navigationItems.map(item => item.href.substring(1));
       const currentSection = sections.find(section => {
         const element = document.getElementById(section);
@@ -55,22 +58,18 @@ const StickyAnchorNav = () => {
 
   return (
     <>
-      <nav className={`fixed top-0 left-0 right-0 z-100 transition-all duration-300 ease-out ${
-        isVisible ? 'translate-y-0 opacity-100' : '-translate-y-full opacity-0'
-      }`}>
+      <nav className="fixed top-0 left-0 right-0 z-100 transition-all duration-300 ease-out">
         <div className="glassmorphism">
           <div className="max-w-container mx-auto px-5 lg:px-8">
             <div className="flex items-center justify-between h-16">
               {/* Logo */}
-              <div className="flex items-center">
-                <div className="flex items-center space-x-2">
-                  <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-                    <Icon name="Zap" size={20} color="var(--color-primary-foreground)" />
-                  </div>
-                  <span className="font-headline-bold text-xl text-foreground">
-                    AgenticAI SDR
-                  </span>
+              <div className="flex items-center space-x-2">
+                <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
+                  <Icon name="Zap" size={20} color="var(--color-primary-foreground)" />
                 </div>
+                <span className="font-headline-bold text-xl text-foreground">
+                 LeadForge AI
+                </span>
               </div>
 
               {/* Desktop Navigation */}
@@ -87,6 +86,14 @@ const StickyAnchorNav = () => {
                     {item.label}
                   </button>
                 ))}
+
+                {/* Login/Dashboard Button */}
+                <button
+                  onClick={() => navigate(isLoggedIn ? '/dashboard' : '/login')}
+                  className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-200"
+                >
+                  {isLoggedIn ? 'Dashboard' : 'Get Started'}
+                </button>
               </div>
 
               {/* Mobile Menu Toggle */}
@@ -142,12 +149,24 @@ const StickyAnchorNav = () => {
                     onClick={() => handleNavClick(item.href)}
                     className={`block w-full text-left p-3 rounded-lg font-body-medium transition-all duration-200 ${
                       activeSection === item.href.substring(1)
-                        ? 'bg-primary/10 text-primary border border-primary/20' :'text-muted-foreground hover:text-foreground hover:bg-muted'
+                        ? 'bg-primary/10 text-primary border border-primary/20' 
+                        : 'text-muted-foreground hover:text-foreground hover:bg-muted'
                     }`}
                   >
                     {item.label}
                   </button>
                 ))}
+
+                {/* Mobile Login/Dashboard Button */}
+                <button
+                  onClick={() => {
+                    setIsMobileMenuOpen(false);
+                    navigate(isLoggedIn ? '/dashboard' : '/login');
+                  }}
+                  className="block w-full text-center px-4 py-3 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 transition-colors duration-200"
+                >
+                  {isLoggedIn ? 'Dashboard' : 'Get Started'}
+                </button>
               </nav>
             </div>
           </div>

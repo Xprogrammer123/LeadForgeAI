@@ -27,8 +27,7 @@ const FooterSection = () => {
     legal: [
       { label: "Privacy Policy", href: "/privacy" },
       { label: "Terms of Service", href: "/terms" },
-      { label: "Cookie Policy", href: "/cookies" },
-      { label: "GDPR", href: "/gdpr" }
+      { label: "Cookie Policy", href: "/cookies" }
     ]
   };
 
@@ -63,7 +62,7 @@ const FooterSection = () => {
                   <Icon name="Zap" size={24} color="var(--color-primary-foreground)" />
                 </div>
                 <span className="font-headline-bold text-xl text-foreground">
-                  AgenticAI SDR
+                 LeadForge AI
                 </span>
               </div>
               
@@ -126,7 +125,7 @@ const FooterSection = () => {
           </div>
         </div>
 
-        {/* Newsletter Signup */}
+        {/* Newsletter Signup 
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -155,6 +154,7 @@ const FooterSection = () => {
             </div>
           </div>
         </motion.div>
+        */}
 
         {/* Bottom Footer */}
         <div className="border-t border-border pt-8">
@@ -167,7 +167,7 @@ const FooterSection = () => {
               viewport={{ once: true }}
               className="text-sm text-muted-foreground"
             >
-              © {currentYear} AgenticAI SDR. All rights reserved.
+              © {currentYear} LeadForge AI. All rights reserved.
             </motion.div>
 
             {/* Social Links */}

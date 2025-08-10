@@ -5,48 +5,48 @@ import Icon from '../../../components/AppIcon';
 const FAQSection = () => {
   const [openFAQ, setOpenFAQ] = useState(0);
 
-  const faqs = [
-    {
-      question: "Is AgenticAI SDR compliant with LinkedIn\'s terms of service?",
-      answer: `Yes, absolutely. AgenticAI SDR is fully compliant with LinkedIn's terms of service and API guidelines. We use official LinkedIn integrations and respect all rate limits and usage policies.\n\nOur AI operates within LinkedIn's acceptable use parameters, ensuring your account remains safe and in good standing. We continuously monitor LinkedIn's policy updates to maintain compliance.`,
-      category: "Compliance"
-    },
-    {
-      question: "How quickly can I see results with AgenticAI SDR?",
-      answer: `Most users see initial results within 48-72 hours of setup. Here's the typical timeline:\n\n• Day 1: Complete setup and AI training\n• Days 2-3: First prospects identified and initial outreach begins\n• Week 1: First responses and connection acceptances\n• Week 2-4: Consistent lead flow and meeting bookings\n\nThe AI improves continuously, so results typically get better over time as it learns your ideal prospect patterns.`,
-      category: "Results"
-    },
-    {
-      question: "What makes your AI personalization different from other tools?",
-      answer: `Our AI goes beyond basic template personalization. It analyzes:\n\n• Recent LinkedIn activity and posts\n• Company news and industry trends\n• Mutual connections and shared interests\n• Job changes and career progression\n• Engagement patterns and response timing\n\nThis creates genuinely personalized messages that feel human-written, not automated. Our response rates are 3-4x higher than generic outreach tools.`,
-      category: "Technology"
-    },
-    {
-      question: "Can I customize the AI\'s messaging style and tone?",
-      answer: `Yes, completely. During setup, you can:\n\n• Upload examples of your best-performing messages\n• Set tone preferences (professional, casual, friendly, etc.)\n• Define your unique value proposition\n• Specify industry-specific language\n• Create custom message templates\n\nThe AI learns your style and maintains consistency across all outreach while adapting to each prospect's profile.`,
-      category: "Customization"
-    },
-    {
-      question: "How does the follow-up sequence work?",
-      answer: `Our smart follow-up system creates multi-touch sequences based on prospect behavior:\n\n• Connection accepted: Welcome message with value proposition\n• No response after 3 days: Soft follow-up with additional value\n• Profile viewed: Personalized message about shared interests\n• Post engagement: Comment on their content before following up\n\nThe AI adjusts timing and messaging based on response patterns and optimal engagement windows for each prospect.`,
-      category: "Features"
-    },
-    {
-      question: "What integrations are available?",
-      answer: `AgenticAI SDR integrates with popular sales tools:\n\n• CRM Systems: Salesforce, HubSpot, Pipedrive, Zoho\n• Email Platforms: Gmail, Outlook, SendGrid\n• Calendar Tools: Calendly, Acuity, Google Calendar\n• Analytics: Google Analytics, Mixpanel\n• Slack for team notifications\n\nWe're constantly adding new integrations based on user requests. Custom integrations are available for Enterprise plans.`,
-      category: "Integrations"
-    },
-    {
-      question: "Is there a limit on the number of prospects I can target?",
-      answer: `Limits depend on your plan:\n\n• Starter: 50 prospects per month\n• Professional: 200 prospects per month\n• Enterprise: Unlimited prospects\n\nThese limits ensure quality over quantity and maintain LinkedIn compliance. The AI focuses on highly qualified prospects rather than mass outreach, leading to better conversion rates.`,
-      category: "Limits"
-    },
-    {
-      question: "What kind of support do you provide?",
-      answer: `We offer comprehensive support across all plans:\n\n• Starter: Email support with 24-hour response time\n• Professional: Priority email + live chat support\n• Enterprise: Dedicated success manager + phone support\n\nAll plans include:\n• Detailed onboarding and setup assistance\n• Best practices training\n• Regular strategy reviews\n• Access to our knowledge base and video tutorials`,
-      category: "Support"
-    }
-  ];
+const faqs = [
+  {
+    question: "How does AgenticAI SDR fetch leads from LinkedIn?",
+    answer: `We use our secure Lix integration to search, filter, and fetch leads directly from LinkedIn while staying compliant with their terms. The system pulls details like job titles, industries, locations, and contact info when available.\n\nYour campaigns run through our backend service which triggers Supabase updates when each fetch completes.`,
+    category: "Technology"
+  },
+  {
+    question: "Is the lead data fresh and accurate?",
+    answer: `Yes. Each lead search is performed in real time, so you’re not getting stale lists. Our Lix integration verifies contact data, checks LinkedIn activity, and flags unverified entries.\n\nWe focus on quality over volume, prioritizing verified emails and phone numbers whenever possible.`,
+    category: "Data Quality"
+  },
+  {
+    question: "What happens after a campaign finishes fetching leads?",
+    answer: `When a campaign completes, our backend automatically updates its status in Supabase to "completed".\n\nThis ensures your dashboard reflects real-time progress without you having to manually track each campaign.`,
+    category: "Automation"
+  },
+  {
+    question: "Can I filter prospects before fetching?",
+    answer: `Absolutely. You can target by:\n\n• Job titles\n• Industries\n• Locations\n• Company size\n• Experience level\n\nThese filters are passed to our Lix search endpoint so only relevant, qualified leads are fetched.`,
+    category: "Targeting"
+  },
+  {
+    question: "How fast can I start seeing leads?",
+    answer: `In most cases, leads start appearing in your dashboard within minutes after launching a campaign. Larger searches may take a few hours to fully process.\n\nThe system updates your campaign in Supabase as soon as the fetch is done, so you’ll know the exact completion time.`,
+    category: "Results"
+  },
+  {
+    question: "What tools does AgenticAI SDR integrate with?",
+    answer: `Alongside LinkedIn and Lix, we integrate with:\n\n• Supabase for storage & real-time updates\n• CRMs like HubSpot, Pipedrive, and Salesforce (via API)\n• Email delivery through Gmail, Outlook, and SendGrid\n• Slack for instant lead alerts\n\nWe can also build custom integrations for Enterprise clients.`,
+    category: "Integrations"
+  },
+  {
+    question: "Is my LinkedIn account safe?",
+    answer: `Yes. All LinkedIn operations are performed via approved APIs or browser automation within compliance limits.\n\nWe never store your LinkedIn password, and we monitor usage patterns to prevent triggering LinkedIn’s security checks.`,
+    category: "Compliance"
+  },
+  {
+    question: "What kind of support do you offer?",
+    answer: `We provide:\n\n• Email support for all plans\n• Priority live chat for Professional and Enterprise\n• Dedicated account managers for Enterprise\n\nWe also offer onboarding help, best practice advice, and campaign optimization sessions.`,
+    category: "Support"
+  }
+];
 
   const toggleFAQ = (index) => {
     setOpenFAQ(openFAQ === index ? -1 : index);

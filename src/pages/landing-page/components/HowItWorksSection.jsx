@@ -8,41 +8,44 @@ const HowItWorksSection = () => {
   const steps = [
     {
       number: "01",
-      title: "AI Prospect Identification",
-      description: "Our AI scans LinkedIn to find your ideal prospects based on your criteria, industry, company size, and recent activity patterns.",
+      title: "Create Your Campaign",
+      description:
+        "Easily create a new campaign in our dashboard. Supabase automatically generates a unique campaign ID so everything stays organized and traceable.",
       features: [
-        "Advanced LinkedIn search algorithms",
-        "Real-time prospect scoring",
-        "Industry-specific targeting",
-        "Company growth indicators"
+        "Quick campaign creation form",
+        "Automatic UUID generation",
+        "Supabase-powered storage",
+        "Instant availability in dashboard"
       ],
-      icon: "Search",
+      icon: "FolderPlus",
       color: "primary"
     },
     {
-      number: "02", 
-      title: "Personalized Message Generation",
-      description: "AI analyzes each prospect's profile, recent posts, and company news to craft highly personalized connection requests and follow-up messages.",
+      number: "02",
+      title: "Add & Manage Prospects",
+      description:
+        "Upload or sync your prospect list, or let the AI find them for you. All prospects are linked directly to your campaign via the campaign ID.",
       features: [
-        "Profile analysis and insights",
-        "Recent activity monitoring",
-        "Company news integration",
-        "Personalization at scale"
+        "Manual upload or API sync",
+        "AI prospect finder",
+        "Real-time list updates",
+        "Secure Supabase storage"
       ],
-      icon: "MessageSquare",
+      icon: "Users",
       color: "secondary"
     },
     {
       number: "03",
-      title: "Automated Follow-up Sequences",
-      description: "Smart follow-up sequences run 24/7, nurturing prospects through your sales funnel with perfectly timed, contextual messages.",
+      title: "Launch & Track Automation",
+      description:
+        "Run your outreach sequences directly from the platform. Monitor open rates, responses, and conversions, all tied back to the campaign ID for accurate tracking.",
       features: [
-        "Multi-touch sequences",
-        "Optimal timing algorithms",
-        "Response detection",
-        "CRM integration"
+        "Automated outreach sequences",
+        "Email & LinkedIn integration",
+        "Response and status tracking",
+        "Detailed campaign analytics"
       ],
-      icon: "Repeat",
+      icon: "TrendingUp",
       color: "accent"
     }
   ];
@@ -54,6 +57,7 @@ const HowItWorksSection = () => {
   return (
     <section id="how-it-works" className="py-20 bg-background">
       <div className="max-w-6xl mx-auto px-5 lg:px-8">
+        {/* Heading */}
         <motion.div
           initial={{ opacity: 0, y: 30 }}
           whileInView={{ opacity: 1, y: 0 }}
@@ -65,8 +69,7 @@ const HowItWorksSection = () => {
             How It Works
           </h2>
           <p className="font-body text-xl text-muted-foreground max-w-3xl mx-auto">
-            Three simple steps to transform your LinkedIn into an AI-powered lead generation machine. 
-            Setup takes just 5 minutes, then watch your pipeline fill automatically.
+            From campaign creation to automated outreach — here’s how your AI-powered lead generation runs on Supabase.
           </p>
         </motion.div>
 
@@ -89,7 +92,7 @@ const HowItWorksSection = () => {
           </div>
         </div>
 
-        {/* Active Step Content */}
+        {/* Step Details */}
         <motion.div
           key={activeStep}
           initial={{ opacity: 0, y: 20 }}
@@ -97,20 +100,26 @@ const HowItWorksSection = () => {
           transition={{ duration: 0.5 }}
           className="grid lg:grid-cols-2 gap-12 items-center"
         >
-          {/* Step Details */}
           <div>
             <div className="flex items-center space-x-4 mb-6">
-              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
-                steps[activeStep].color === 'primary' ? 'bg-primary/10' :
-                steps[activeStep].color === 'secondary'? 'bg-secondary/10' : 'bg-accent/10'
-              }`}>
-                <Icon 
-                  name={steps[activeStep].icon} 
-                  size={32} 
+              <div
+                className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                  steps[activeStep].color === 'primary'
+                    ? 'bg-primary/10'
+                    : steps[activeStep].color === 'secondary'
+                    ? 'bg-secondary/10'
+                    : 'bg-accent/10'
+                }`}
+              >
+                <Icon
+                  name={steps[activeStep].icon}
+                  size={32}
                   color={
-                    steps[activeStep].color === 'primary' ? 'var(--color-primary)' :
-                    steps[activeStep].color === 'secondary' ? 'var(--color-secondary)' :
-                    'var(--color-accent)'
+                    steps[activeStep].color === 'primary'
+                      ? 'var(--color-primary)'
+                      : steps[activeStep].color === 'secondary'
+                      ? 'var(--color-secondary)'
+                      : 'var(--color-accent)'
                   }
                 />
               </div>
@@ -144,21 +153,24 @@ const HowItWorksSection = () => {
             </div>
           </div>
 
-          {/* Visual Representation */}
+          {/* Visual */}
           <div className="glassmorphism rounded-xl p-8">
             <div className="aspect-square bg-surface/50 rounded-lg flex items-center justify-center relative overflow-hidden">
-              {/* Animated Background Pattern */}
+              {/* Background dots */}
               <div className="absolute inset-0 opacity-20">
                 {[...Array(6)].map((_, i) => (
                   <motion.div
                     key={i}
                     className={`absolute w-2 h-2 rounded-full ${
-                      steps[activeStep].color === 'primary' ? 'bg-primary' :
-                      steps[activeStep].color === 'secondary'? 'bg-secondary' : 'bg-accent'
+                      steps[activeStep].color === 'primary'
+                        ? 'bg-primary'
+                        : steps[activeStep].color === 'secondary'
+                        ? 'bg-secondary'
+                        : 'bg-accent'
                     }`}
                     style={{
-                      left: `${20 + (i * 15)}%`,
-                      top: `${30 + (i * 10)}%`
+                      left: `${20 + i * 15}%`,
+                      top: `${30 + i * 10}%`
                     }}
                     animate={{
                       scale: [1, 1.5, 1],
@@ -179,49 +191,30 @@ const HowItWorksSection = () => {
                 animate={{ scale: 1, opacity: 1 }}
                 transition={{ duration: 0.5 }}
                 className={`w-24 h-24 rounded-full flex items-center justify-center ${
-                  steps[activeStep].color === 'primary' ? 'bg-primary/20' :
-                  steps[activeStep].color === 'secondary'? 'bg-secondary/20' : 'bg-accent/20'
+                  steps[activeStep].color === 'primary'
+                    ? 'bg-primary/20'
+                    : steps[activeStep].color === 'secondary'
+                    ? 'bg-secondary/20'
+                    : 'bg-accent/20'
                 }`}
               >
-                <Icon 
-                  name={steps[activeStep].icon} 
-                  size={48} 
+                <Icon
+                  name={steps[activeStep].icon}
+                  size={48}
                   color={
-                    steps[activeStep].color === 'primary' ? 'var(--color-primary)' :
-                    steps[activeStep].color === 'secondary' ? 'var(--color-secondary)' :
-                    'var(--color-accent)'
+                    steps[activeStep].color === 'primary'
+                      ? 'var(--color-primary)'
+                      : steps[activeStep].color === 'secondary'
+                      ? 'var(--color-secondary)'
+                      : 'var(--color-accent)'
                   }
                 />
               </motion.div>
-
-              {/* Orbiting Elements */}
-              {[...Array(3)].map((_, i) => (
-                <motion.div
-                  key={i}
-                  className={`absolute w-4 h-4 rounded-full ${
-                    steps[activeStep].color === 'primary' ? 'bg-primary' :
-                    steps[activeStep].color === 'secondary'? 'bg-secondary' : 'bg-accent'
-                  }`}
-                  style={{
-                    left: '50%',
-                    top: '50%',
-                    transformOrigin: `${60 + (i * 20)}px 0px`
-                  }}
-                  animate={{
-                    rotate: 360
-                  }}
-                  transition={{
-                    duration: 4 + (i * 2),
-                    repeat: Infinity,
-                    ease: "linear"
-                  }}
-                />
-              ))}
             </div>
           </div>
         </motion.div>
 
-        {/* Progress Indicator */}
+        {/* Progress dots */}
         <div className="flex justify-center mt-12">
           <div className="flex space-x-2">
             {steps.map((_, index) => (
